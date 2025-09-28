@@ -139,7 +139,13 @@ else
   echo "  Watcher PID: $WATCHER_PID"
   echo ""
   # Detect the actual frontend port (default 5173, or next available)
-  FRONTEND_PORT=$(netstat -an | grep LISTEN | grep ':517[3-9]' | head -1 | sed 's/.*:\([0-9]*\).*/\1/' || echo "5173")
+  if lsof -ti:5173 > /dev/null 2>&1; then
+    FRONTEND_PORT="5173"
+  elif lsof -ti:5174 > /dev/null 2>&1; then
+    FRONTEND_PORT="5174"
+  else
+    FRONTEND_PORT="5173"
+  fi
   echo "Frontend: http://localhost:$FRONTEND_PORT"
   echo "Backend:  http://localhost:8000"
 fi

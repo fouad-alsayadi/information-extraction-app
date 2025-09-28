@@ -293,5 +293,15 @@ mlartifacts/
 # UV
 .uv/
 
-# Generated client
-client/src/client/
+# Generated client (auto-generated from FastAPI)
+client/src/fastapi_client/
+
+# Frontend build artifacts (auto-generated)
+client/build/
+client/dist/
+
+# Frontend dependencies and locks
+client/node_modules/
+client/bun.lock
+client/package-lock.json
+client/yarn.lock
