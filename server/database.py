@@ -87,25 +87,54 @@ def create_tables() -> None:
             # Create schema if it doesn't exist
             cursor.execute("CREATE SCHEMA IF NOT EXISTS information_extraction")
 
-            # Create extraction_schemas table
+            # Create extraction_schemas table (updated to match notebook expectations)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.extraction_schemas (
                     id SERIAL PRIMARY KEY,
                     name TEXT NOT NULL,
                     description TEXT DEFAULT '',
-                    schema_definition TEXT NOT NULL,
+                    fields TEXT NOT NULL,
                     is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
-            # Create extraction_jobs table
+            # Migrate existing schema_definition column to fields column
+            cursor.execute("""
+                DO $$
+                BEGIN
+                    -- Check if schema_definition column exists and fields doesn't
+                    IF EXISTS (SELECT 1 FROM information_schema.columns
+                              WHERE table_schema = 'information_extraction'
+                              AND table_name = 'extraction_schemas'
+                              AND column_name = 'schema_definition')
+                       AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                      WHERE table_schema = 'information_extraction'
+                                      AND table_name = 'extraction_schemas'
+                                      AND column_name = 'fields') THEN
+                        -- Add fields column
+                        ALTER TABLE information_extraction.extraction_schemas ADD COLUMN fields TEXT;
+
+                        -- Copy data from schema_definition to fields
+                        UPDATE information_extraction.extraction_schemas SET fields = schema_definition;
+
+                        -- Make fields NOT NULL
+                        ALTER TABLE information_extraction.extraction_schemas ALTER COLUMN fields SET NOT NULL;
+
+                        -- Drop old column
+                        ALTER TABLE information_extraction.extraction_schemas DROP COLUMN schema_definition;
+                    END IF;
+                END $$;
+            """)
+
+            # Create extraction_jobs table (updated with upload_directory)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.extraction_jobs (
                     id SERIAL PRIMARY KEY,
                     name TEXT NOT NULL,
                     schema_id INTEGER NOT NULL,
                     status TEXT NOT NULL DEFAULT 'pending',
+                    upload_directory TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     completed_at TIMESTAMP,
@@ -113,6 +142,19 @@ def create_tables() -> None:
                     databricks_run_id INTEGER,
                     FOREIGN KEY (schema_id) REFERENCES information_extraction.extraction_schemas (id)
                 )
+            """)
+
+            # Add upload_directory column if it doesn't exist
+            cursor.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                  WHERE table_schema = 'information_extraction'
+                                  AND table_name = 'extraction_jobs'
+                                  AND column_name = 'upload_directory') THEN
+                        ALTER TABLE information_extraction.extraction_jobs ADD COLUMN upload_directory TEXT;
+                    END IF;
+                END $$;
             """)
 
             # Create documents table
@@ -144,11 +186,40 @@ def create_tables() -> None:
                 )
             """)
 
+            # Create upload_logs table (required by notebook)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS information_extraction.upload_logs (
+                    id SERIAL PRIMARY KEY,
+                    analysis_id INTEGER NOT NULL,
+                    upload_directory TEXT NOT NULL,
+                    event_type TEXT DEFAULT 'upload',
+                    message TEXT,
+                    details TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (analysis_id) REFERENCES information_extraction.extraction_jobs (id)
+                )
+            """)
+
+            # Create extraction_job_results table (dynamic table created by notebook)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS information_extraction.extraction_job_results (
+                    row_number INTEGER,
+                    analysis_id INTEGER,
+                    schema_id INTEGER,
+                    path TEXT,
+                    extracted_fields TEXT,
+                    PRIMARY KEY (row_number, analysis_id, schema_id),
+                    FOREIGN KEY (analysis_id) REFERENCES information_extraction.extraction_jobs (id),
+                    FOREIGN KEY (schema_id) REFERENCES information_extraction.extraction_schemas (id)
+                )
+            """)
+
             # Create indexes for better performance
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON information_extraction.extraction_jobs (status)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_schema_id ON information_extraction.extraction_jobs (schema_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_documents_job_id ON information_extraction.documents (job_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_results_job_id ON information_extraction.extraction_results (job_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_upload_logs_analysis_id ON information_extraction.upload_logs (analysis_id)")
 
             conn.commit()
     finally:
@@ -178,10 +249,10 @@ def create_extraction_schema(schema: DBExtractionSchema) -> int:
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                INSERT INTO information_extraction.extraction_schemas (name, description, schema_definition, is_active)
+                INSERT INTO information_extraction.extraction_schemas (name, description, fields, is_active)
                 VALUES (%s, %s, %s, %s)
                 RETURNING id
-            """, (schema.name, schema.description, schema.schema_definition, schema.is_active))
+            """, (schema.name, schema.description, schema.fields, schema.is_active))
             schema_id = cursor.fetchone()[0]
             conn.commit()
             return schema_id
@@ -195,13 +266,13 @@ def get_extraction_schema(schema_id: int) -> Optional[ExtractionSchema]:
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
             cursor.execute("""
-                SELECT id, name, description, schema_definition, is_active, created_at
+                SELECT id, name, description, fields, is_active, created_at
                 FROM information_extraction.extraction_schemas
                 WHERE id = %s
             """, (schema_id,))
             row = cursor.fetchone()
             if row:
-                fields = json.loads(row['schema_definition'])
+                fields = json.loads(row['fields'])
                 return ExtractionSchema(
                     id=row['id'],
                     name=row['name'],
@@ -225,7 +296,7 @@ def get_all_extraction_schemas() -> List[ExtractionSchemaSummary]:
                     id,
                     name,
                     description,
-                    schema_definition,
+                    fields,
                     is_active,
                     created_at
                 FROM information_extraction.extraction_schemas
@@ -234,7 +305,7 @@ def get_all_extraction_schemas() -> List[ExtractionSchemaSummary]:
             rows = cursor.fetchall()
             schemas = []
             for row in rows:
-                fields = json.loads(row['schema_definition'])
+                fields = json.loads(row['fields'])
                 schemas.append(ExtractionSchemaSummary(
                     id=row['id'],
                     name=row['name'],
@@ -260,7 +331,7 @@ def update_extraction_schema(schema_id: int, updates: Dict[str, Any]) -> bool:
             values = []
 
             for key, value in updates.items():
-                if key in ['name', 'description', 'schema_definition', 'is_active']:
+                if key in ['name', 'description', 'fields', 'is_active']:
                     set_clauses.append(f"{key} = %s")
                     values.append(value)
 
@@ -490,5 +561,26 @@ def get_results_by_job(job_id: int) -> List[Dict[str, Any]]:
                     result_dict['confidence_scores'] = json.loads(result_dict['confidence_scores'])
                 results.append(result_dict)
             return results
+    finally:
+        return_db_connection(conn)
+
+
+# ============================================================================
+# UPLOAD LOG OPERATIONS (required by notebook)
+# ============================================================================
+
+def create_upload_log(analysis_id: int, upload_directory: str, event_type: str = 'upload', message: str = '', details: str = '') -> int:
+    """Create a new upload log entry and return its ID."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO information_extraction.upload_logs (analysis_id, upload_directory, event_type, message, details)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+            """, (analysis_id, upload_directory, event_type, message, details))
+            log_id = cursor.fetchone()[0]
+            conn.commit()
+            return log_id
     finally:
         return_db_connection(conn)

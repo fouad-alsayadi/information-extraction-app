@@ -4,9 +4,10 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 
 from server.database import create_tables, init_db_pool, test_db_connection
 from server.routers import router
@@ -30,6 +31,17 @@ def load_env_file(filepath: str) -> None:
 # Load .env files
 load_env_file('.env')
 load_env_file('.env.local')
+
+# Configure logging to show full tracebacks
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Also configure uvicorn logger to show exceptions
+uvicorn_logger = logging.getLogger("uvicorn.error")
+uvicorn_logger.setLevel(logging.DEBUG)
 
 
 @asynccontextmanager
@@ -71,6 +83,23 @@ app.add_middleware(
   allow_methods=['*'],
   allow_headers=['*'],
 )
+
+
+# Global exception handler to log full tracebacks
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Log full traceback for all unhandled exceptions."""
+    import traceback
+    logger = logging.getLogger(__name__)
+    logger.error(f"Unhandled exception on {request.method} {request.url}")
+    logger.error(f"Exception: {str(exc)}")
+    logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+    # Return generic 500 error to client
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
 
 app.include_router(router, prefix='/api', tags=['api'])
 app.include_router(schemas_router, prefix='/api', tags=['schemas'])

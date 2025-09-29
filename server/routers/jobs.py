@@ -1,16 +1,21 @@
 """API routes for extraction job management."""
 
 import json
+import logging
 import os
+import traceback
 from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
+logger = logging.getLogger(__name__)
 from databricks.sdk import WorkspaceClient
 
 from server.database import (
     create_document,
     create_extraction_job,
+    create_upload_log,
     get_all_extraction_jobs,
     get_documents_by_job,
     get_extraction_job,
@@ -72,6 +77,8 @@ async def get_jobs():
             for job in jobs_data
         ]
     except Exception as e:
+        logger.error(f"Error fetching jobs: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f'Failed to fetch jobs: {str(e)}')
 
 
@@ -99,6 +106,8 @@ async def create_job(job: ExtractionJobCreate):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error creating job: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f'Failed to create job: {str(e)}')
 
 
@@ -191,13 +200,18 @@ async def upload_files(
             uploaded_files.append(file.filename)
             total_size += len(content)
 
-        # Update job status to indicate files are uploaded
-        update_extraction_job(job_id, {'status': 'uploaded'})
+        # Update job status and upload directory
+        update_extraction_job(job_id, {
+            'status': 'uploaded',
+            'upload_directory': job_upload_path
+        })
+
+        # Create upload log entry (required by notebook)
+        create_upload_log(job_id, job_upload_path, 'upload', 'Files uploaded to UC Volumes')
 
         # Trigger Databricks processing
         try:
-            file_paths = [f"{job_upload_path}/{filename}" for filename in uploaded_files]
-            run_id = await DatabricksService.trigger_extraction_job(job_id, job.schema_id, file_paths)
+            run_id = await DatabricksService.trigger_extraction_job(job_id, job.schema_id)
 
             # Update job with Databricks run ID and processing status
             update_extraction_job(job_id, {

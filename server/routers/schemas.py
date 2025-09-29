@@ -1,9 +1,13 @@
 """API routes for extraction schema management."""
 
 import json
+import logging
+import traceback
 from typing import List
 
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger(__name__)
 
 from server.database import (
     create_extraction_schema,
@@ -29,6 +33,8 @@ async def get_schemas():
     try:
         return get_all_extraction_schemas()
     except Exception as e:
+        logger.error(f"Error fetching schemas: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f'Failed to fetch schemas: {str(e)}')
 
 
@@ -42,7 +48,7 @@ async def create_schema(schema: ExtractionSchemaCreate):
         db_schema = DBExtractionSchema(
             name=schema.name,
             description=schema.description,
-            schema_definition=fields_json,
+            fields=fields_json,
         )
 
         schema_id = create_extraction_schema(db_schema)
@@ -53,6 +59,8 @@ async def create_schema(schema: ExtractionSchemaCreate):
             'schema_id': schema_id,
         }
     except Exception as e:
+        logger.error(f"Error creating schema: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f'Failed to create schema: {str(e)}')
 
 
@@ -67,6 +75,8 @@ async def get_schema(schema_id: int):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error fetching schema {schema_id}: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f'Failed to fetch schema: {str(e)}')
 
 
@@ -86,7 +96,7 @@ async def update_schema(schema_id: int, schema_update: ExtractionSchemaUpdate):
         if schema_update.description is not None:
             updates['description'] = schema_update.description
         if schema_update.fields is not None:
-            updates['schema_definition'] = json.dumps([field.dict() for field in schema_update.fields])
+            updates['fields'] = json.dumps([field.model_dump() for field in schema_update.fields])
         if schema_update.is_active is not None:
             updates['is_active'] = schema_update.is_active
 

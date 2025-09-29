@@ -2,7 +2,7 @@
 
 import json
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from databricks.sdk import WorkspaceClient
 
@@ -30,20 +30,17 @@ class DatabricksService:
     @staticmethod
     async def trigger_extraction_job(
         job_id: int,
-        schema_id: int,
-        file_paths: List[str]
+        schema_id: int
     ) -> int:
         """Trigger Databricks notebook for document processing."""
         try:
             client = DatabricksService._get_client()
             databricks_job_id = DatabricksService._get_job_id()
 
-            # Prepare notebook parameters
+            # Prepare notebook parameters (simplified to match original folio-parse-stream)
             notebook_params = {
-                'extraction_job_id': str(job_id),
-                'schema_id': str(schema_id),
-                'file_paths': json.dumps(file_paths),
-                'callback_endpoint': f'{os.getenv("CALLBACK_BASE_URL", "")}/api/jobs/{job_id}/callback',
+                'analysis_id': str(job_id),
+                'schema_id': str(schema_id)
             }
 
             # Trigger the job

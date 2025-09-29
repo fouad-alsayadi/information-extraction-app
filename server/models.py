@@ -88,6 +88,7 @@ class ExtractionJob(BaseModel):
     name: str
     schema_id: int
     status: str
+    upload_directory: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -218,7 +219,7 @@ class DBExtractionSchema(BaseModel):
     id: Optional[int] = None
     name: str
     description: str
-    schema_definition: str  # JSON string
+    fields: str  # JSON string
     is_active: bool = True
     created_at: Optional[datetime] = None
 
