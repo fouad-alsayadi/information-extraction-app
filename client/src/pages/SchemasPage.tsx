@@ -1,9 +1,13 @@
 /**
  * Schemas page for managing extraction schemas
+ * Based on folio-parse-stream design patterns with corporate styling
  */
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, FileText, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, Calendar, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { apiClient, ExtractionSchemaSummary, SchemaField } from '../lib/api';
 
 export function SchemasPage() {
@@ -57,136 +61,138 @@ export function SchemasPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gradient-subtle">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2 text-muted-foreground">Loading schemas...</span>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Extraction Schemas</h1>
-          <p className="mt-2 text-gray-600">
-            Define what information to extract from your documents
-          </p>
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Schema
-        </button>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
+    <div className="min-h-screen bg-gradient-subtle">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-corporate">Schema Management</h1>
+            <p className="mt-2 text-muted-foreground">
+              Create and manage extraction templates for your documents
+            </p>
           </div>
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-gradient-accent text-accent-foreground hover:opacity-90"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create New Schema
+          </Button>
         </div>
-      )}
 
-      {/* Schemas Grid */}
-      {schemas.length === 0 ? (
-        <div className="text-center py-12">
-          <FileText className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No schemas yet</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Get started by creating your first extraction schema
-          </p>
-          <div className="mt-6">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Schema
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {schemas.map((schema) => (
-            <div
-              key={schema.id}
-              className="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
-            >
-              <div className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <FileText className="h-6 w-6 text-blue-600" />
-                    <h3 className="ml-3 text-lg font-medium text-gray-900 truncate">
-                      {schema.name}
-                    </h3>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => {/* TODO: Edit schema */}}
-                      className="text-gray-400 hover:text-gray-600"
-                      title="Edit schema"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSchema(schema.id, schema.name)}
-                      className="text-gray-400 hover:text-red-600"
-                      title="Delete schema"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <p className="mt-3 text-sm text-gray-500 line-clamp-2">
-                  {schema.description || 'No description provided'}
-                </p>
-
-                <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
-                  <span>{schema.fields_count} fields</span>
-                  <div className="flex items-center">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    {new Date(schema.created_at).toLocaleDateString()}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between">
-                  <span
-                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      schema.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {schema.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
+        {/* Error Message */}
+        {error && (
+          <Card className="mb-6 border-destructive/20 bg-destructive/10">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                <span className="text-sm">{error}</span>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Create Schema Modal */}
-      {showCreateModal && (
-        <CreateSchemaModal
-          onClose={() => setShowCreateModal(false)}
-          onCreate={handleCreateSchema}
-        />
-      )}
+        {/* Empty State or Schema Grid */}
+        {schemas.length === 0 ? (
+          <Card className="bg-card border-border shadow-soft">
+            <CardContent className="p-12 text-center">
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">No schemas found</h3>
+              <p className="text-muted-foreground mb-6">
+                Create your first schema to start extracting data from documents
+              </p>
+              <Button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-primary text-primary-foreground hover:bg-primary-hover"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create Your First Schema
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {schemas.map((schema) => (
+              <Card
+                key={schema.id}
+                className="bg-card border-border shadow-soft hover:shadow-medium transition-shadow"
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FileText className="h-6 w-6 text-primary" />
+                      <h3 className="ml-3 text-lg font-medium text-foreground truncate">
+                        {schema.name}
+                      </h3>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {/* TODO: Edit schema */}}
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Edit schema"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSchema(schema.id, schema.name)}
+                        className="text-muted-foreground hover:text-destructive"
+                        title="Delete schema"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <p className="mt-3 text-sm text-muted-foreground line-clamp-2">
+                    {schema.description || 'No description provided'}
+                  </p>
+
+                  <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{schema.fields_count} fields</span>
+                    <div className="flex items-center">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      {new Date(schema.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between">
+                    <Badge
+                      variant={schema.is_active ? "default" : "secondary"}
+                      className={schema.is_active ? "bg-success text-success-foreground" : ""}
+                    >
+                      {schema.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Create Schema Modal */}
+        {showCreateModal && (
+          <CreateSchemaModal
+            onClose={() => setShowCreateModal(false)}
+            onCreate={handleCreateSchema}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -279,13 +285,15 @@ function CreateSchemaModal({ onClose, onCreate }: CreateSchemaModalProps) {
                 <label className="block text-sm font-medium text-gray-700">
                   Fields *
                 </label>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={addField}
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="text-sm text-primary hover:text-primary-hover"
                 >
                   + Add Field
-                </button>
+                </Button>
               </div>
 
               <div className="space-y-3">
@@ -322,13 +330,15 @@ function CreateSchemaModal({ onClose, onCreate }: CreateSchemaModalProps) {
                           />
                           Required
                         </label>
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => removeField(index)}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-destructive hover:text-destructive/80"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                     <div className="mt-2">
@@ -347,19 +357,19 @@ function CreateSchemaModal({ onClose, onCreate }: CreateSchemaModalProps) {
 
             {/* Actions */}
             <div className="flex justify-end space-x-3 pt-4">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="bg-gradient-primary text-primary-foreground hover:opacity-90"
               >
                 Create Schema
-              </button>
+              </Button>
             </div>
           </form>
         </div>

@@ -2,75 +2,272 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Information Extraction Platform - Corporate Design System
+Inspired by Sanabil's professional corporate aesthetic
+Enhanced for accessibility and modern design patterns
+All colors MUST be HSL for consistent theming.
+*/
+
 @layer base {
   :root {
+    /* Corporate Background System */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 25 25% 12%;
 
+    /* Surface Colors */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 25 25% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 25 25% 12%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Corporate Brown Primary - Matching Sanabil's Brand */
+    --primary: 25 45% 15%;
+    --primary-foreground: 0 0% 98%;
+    --primary-hover: 25 45% 20%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
+    /* Professional Secondary */
+    --secondary: 25 15% 95%;
+    --secondary-foreground: 25 25% 25%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted Professional Tones */
+    --muted: 25 15% 96%;
+    --muted-foreground: 25 15% 45%;
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
+    /* Premium Bronze Accent */
+    --accent: 35 65% 45%;
+    --accent-foreground: 0 0% 98%;
+    --accent-subtle: 35 35% 95%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Status Colors - Enhanced for Accessibility */
+    --success: 145 65% 42%;
+    --success-foreground: 0 0% 98%;
+    --warning: 35 85% 55%;
+    --warning-foreground: 25 25% 12%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --info: 220 70% 50%;
+    --info-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Interface Elements */
+    --border: 25 20% 88%;
+    --input: 25 20% 88%;
+    --ring: 25 45% 15%;
 
-    --radius: 0.5rem;
+    /* Corporate Brown Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(25 45% 15%), hsl(25 45% 25%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(25 15% 98%));
+    --gradient-accent: linear-gradient(135deg, hsl(35 65% 45%), hsl(35 65% 55%));
+    --gradient-hero: linear-gradient(135deg, hsl(25 45% 15%) 0%, hsl(35 65% 45%) 100%);
+
+    /* Professional Shadows - Enhanced Depth */
+    --shadow-soft: 0 2px 8px -2px hsl(25 25% 12% / 0.08);
+    --shadow-medium: 0 4px 16px -4px hsl(25 25% 12% / 0.12);
+    --shadow-strong: 0 8px 32px -8px hsl(25 25% 12% / 0.16);
+    --shadow-glow: 0 0 20px hsl(35 65% 45% / 0.15);
+
+    /* Animation & Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    /* Enhanced Border Radius */
+    --radius: 0.75rem;
+    --radius-sm: 0.5rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.5rem;
+
+    /* Sidebar Theme Variables */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Typography Scale */
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 1.875rem;
+    --font-size-4xl: 2.25rem;
+
+    /* Spacing Scale */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-12: 3rem;
+    --space-16: 4rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark Corporate Background */
+    --background: 25 25% 8%;
+    --foreground: 25 15% 92%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    /* Dark Surface Colors */
+    --card: 25 25% 12%;
+    --card-foreground: 25 15% 92%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 25 25% 12%;
+    --popover-foreground: 25 15% 92%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Dark Corporate Brown */
+    --primary: 25 25% 88%;
+    --primary-foreground: 25 25% 12%;
+    --primary-hover: 25 25% 82%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    /* Dark Professional Secondary */
+    --secondary: 25 15% 18%;
+    --secondary-foreground: 25 15% 82%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    /* Dark Muted Tones */
+    --muted: 25 15% 16%;
+    --muted-foreground: 25 15% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Dark Premium Bronze Accent */
+    --accent: 35 65% 55%;
+    --accent-foreground: 25 25% 12%;
+    --accent-subtle: 35 25% 15%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    /* Dark Status Colors */
+    --success: 145 65% 52%;
+    --success-foreground: 25 25% 12%;
+    --warning: 35 85% 65%;
+    --warning-foreground: 25 25% 12%;
+    --destructive: 0 75% 65%;
+    --destructive-foreground: 25 25% 12%;
+    --info: 220 70% 60%;
+    --info-foreground: 25 25% 12%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    /* Dark Interface Elements */
+    --border: 25 20% 22%;
+    --input: 25 20% 22%;
+    --ring: 25 25% 88%;
+
+    /* Dark Sidebar */
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Dark Shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.2);
+    --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.3);
+    --shadow-strong: 0 8px 32px -8px hsl(0 0% 0% / 0.4);
+    --shadow-glow: 0 0 20px hsl(35 65% 55% / 0.2);
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
+
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Enhanced Focus Styles for Accessibility */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Smooth Scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Typography Improvements */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.025em;
+  }
+
+  /* Interactive Elements */
+  button, [role="button"], input[type="submit"] {
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+
+  /* Selection Colors */
+  ::selection {
+    background-color: hsl(var(--accent) / 0.2);
+    color: hsl(var(--accent-foreground));
+  }
+}
+
+@layer components {
+  /* Utility Classes for Corporate Design */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-subtle {
+    background: var(--gradient-subtle);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-medium {
+    box-shadow: var(--shadow-medium);
+  }
+
+  .shadow-strong {
+    box-shadow: var(--shadow-strong);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* Animation Classes */
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+
+  .transition-fast {
+    transition: var(--transition-fast);
+  }
+
+  .transition-bounce {
+    transition: var(--transition-bounce);
+  }
+
+  /* Corporate Typography */
+  .text-corporate {
+    color: hsl(var(--primary));
+    font-weight: 600;
+  }
+
+  .text-accent-corporate {
+    color: hsl(var(--accent));
+    font-weight: 500;
   }
 }
