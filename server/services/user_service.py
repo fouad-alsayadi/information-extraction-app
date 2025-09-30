@@ -16,14 +16,12 @@ class UserService:
     return self.client.current_user.me()
 
   def get_user_info(self) -> dict:
-    """Get formatted user information."""
+    """Get formatted user information for display."""
     user = self.get_current_user()
     return {
-      'userName': user.user_name or 'unknown',
-      'displayName': user.display_name,
+      'email': user.user_name or 'unknown',  # This is the email
+      'displayName': user.display_name or user.name or 'Unknown User',  # Name to display
       'active': user.active or False,
-      'emails': [email.value for email in (user.emails or [])],
-      'groups': [group.display for group in (user.groups or [])],
     }
 
   def get_user_workspace_info(self) -> dict:
@@ -35,8 +33,8 @@ class UserService:
 
     return {
       'user': {
-        'userName': user.user_name or 'unknown',
-        'displayName': user.display_name,
+        'email': user.user_name or 'unknown',  # This is the email
+        'displayName': user.display_name or user.name or 'Unknown User',  # Name to display
         'active': user.active or False,
       },
       'workspace': {

@@ -11,10 +11,9 @@ router = APIRouter()
 class UserInfo(BaseModel):
   """Databricks user information."""
 
-  userName: str
-  displayName: str | None = None
+  email: str  # User's email address
+  displayName: str  # Name to display
   active: bool
-  emails: list[str] = []
 
 
 class UserWorkspaceInfo(BaseModel):
@@ -32,10 +31,9 @@ async def get_current_user():
     user_info = service.get_user_info()
 
     return UserInfo(
-      userName=user_info['userName'],
+      email=user_info['email'],  # email from service
       displayName=user_info['displayName'],
       active=user_info['active'],
-      emails=user_info['emails'],
     )
   except Exception as e:
     raise HTTPException(status_code=500, detail=f'Failed to fetch user info: {str(e)}')
@@ -50,7 +48,7 @@ async def get_user_workspace_info():
 
     return UserWorkspaceInfo(
       user=UserInfo(
-        userName=info['user']['userName'],
+        email=info['user']['email'],  # email from service
         displayName=info['user']['displayName'],
         active=info['user']['active'],
       ),
