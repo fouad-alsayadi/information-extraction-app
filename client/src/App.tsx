@@ -3,7 +3,7 @@
  * Based on folio-parse-stream design patterns with Sanabil corporate styling
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppSidebar } from './components/AppSidebar';
 import { AppHeader } from './components/AppHeader';
@@ -23,10 +23,42 @@ const queryClient = new QueryClient({
   },
 });
 
+// Helper function to get current page from URL
+const getCurrentPageFromUrl = (): Page => {
+  const path = window.location.pathname;
+  if (path.includes('/upload')) return 'upload';
+  if (path.includes('/results')) return 'results';
+  if (path.includes('/schemas')) return 'schemas';
+  // Default to schemas for root path
+  return 'schemas';
+};
+
+// Helper function to update URL
+const updateUrl = (page: Page) => {
+  const path = `/${page}`;
+  window.history.pushState(null, '', path);
+};
+
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('schemas');
+  const [currentPage, setCurrentPage] = useState<Page>(getCurrentPageFromUrl());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPage(getCurrentPageFromUrl());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Update page and URL
+  const handlePageChange = (page: Page) => {
+    setCurrentPage(page);
+    updateUrl(page);
+  };
 
   const renderPage = () => {
     switch (currentPage) {
@@ -47,7 +79,7 @@ function App() {
         {/* Sidebar */}
         <AppSidebar
           currentPage={currentPage}
-          onPageChange={setCurrentPage}
+          onPageChange={handlePageChange}
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}
           collapsed={sidebarCollapsed}

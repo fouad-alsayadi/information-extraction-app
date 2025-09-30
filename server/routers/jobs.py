@@ -63,19 +63,7 @@ def upload_to_uc_volumes(file_content: bytes, file_path: str) -> None:
 async def get_jobs():
     """Get all extraction jobs with summary information."""
     try:
-        jobs_data = get_all_extraction_jobs()
-        return [
-            {
-                'id': job['id'],
-                'name': job['name'],
-                'schema_name': job['schema_name'] or 'Unknown Schema',
-                'status': job['status'],
-                'documents_count': job['documents_count'],
-                'created_at': job['created_at'],
-                'completed_at': job['completed_at'],
-            }
-            for job in jobs_data
-        ]
+        return get_all_extraction_jobs()
     except Exception as e:
         logger.error(f"Error fetching jobs: {str(e)}")
         logger.error(f"Full traceback: {traceback.format_exc()}")

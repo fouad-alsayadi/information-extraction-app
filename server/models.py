@@ -153,6 +153,7 @@ class ExtractionResult(BaseModel):
     schema_id: int
     extracted_data: Dict[str, Any]
     confidence_scores: Optional[Dict[str, float]] = None
+    file_content_checksum: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -164,6 +165,7 @@ class ExtractionResultSummary(BaseModel):
     document_filename: str
     extracted_data: Dict[str, Any]
     confidence_scores: Optional[Dict[str, float]] = None
+    file_content_checksum: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -255,4 +257,5 @@ class DBExtractionResult(BaseModel):
     schema_id: int
     extracted_data: str  # JSON string
     confidence_scores: Optional[str] = None  # JSON string
+    file_content_checksum: Optional[str] = None
     created_at: Optional[datetime] = None

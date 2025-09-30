@@ -39,7 +39,7 @@ class DatabricksService:
 
             # Prepare notebook parameters (simplified to match original folio-parse-stream)
             notebook_params = {
-                'analysis_id': str(job_id),
+                'job_id': str(job_id),
                 'schema_id': str(schema_id)
             }
 

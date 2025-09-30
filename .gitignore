@@ -305,3 +305,12 @@ client/node_modules/
 client/bun.lock
 client/package-lock.json
 client/yarn.lock
+
+# Test artifacts and temporary files
+screenshots/
+tests/playwright/screenshots/
+*.png
+*.jpg
+*.jpeg
+test_files/
+temp_files/

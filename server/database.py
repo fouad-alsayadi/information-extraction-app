@@ -1,6 +1,7 @@
 """Database connection and operations for Information Extraction App."""
 
 import json
+import logging
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -81,13 +82,18 @@ def close_db_pool() -> None:
 
 def create_tables() -> None:
     """Create database tables if they don't exist."""
+    logger = logging.getLogger(__name__)
+    logger.info("🔧 Starting database initialization...")
+
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             # Create schema if it doesn't exist
+            logger.info("Creating information_extraction schema...")
             cursor.execute("CREATE SCHEMA IF NOT EXISTS information_extraction")
 
             # Create extraction_schemas table (updated to match notebook expectations)
+            logger.info("Creating extraction_schemas table...")
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.extraction_schemas (
                     id SERIAL PRIMARY KEY,
@@ -128,6 +134,7 @@ def create_tables() -> None:
             """)
 
             # Create extraction_jobs table (updated with upload_directory)
+            logger.info("Creating extraction_jobs table...")
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.extraction_jobs (
                     id SERIAL PRIMARY KEY,
@@ -139,7 +146,7 @@ def create_tables() -> None:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     completed_at TIMESTAMP,
                     error_message TEXT,
-                    databricks_run_id INTEGER,
+                    databricks_run_id BIGINT,
                     FOREIGN KEY (schema_id) REFERENCES information_extraction.extraction_schemas (id)
                 )
             """)
@@ -153,6 +160,54 @@ def create_tables() -> None:
                                   AND table_name = 'extraction_jobs'
                                   AND column_name = 'upload_directory') THEN
                         ALTER TABLE information_extraction.extraction_jobs ADD COLUMN upload_directory TEXT;
+                    END IF;
+                END $$;
+            """)
+
+            # Migrate databricks_run_id column from INTEGER to BIGINT to support 64-bit run IDs
+            logger.info("🔄 Migrating databricks_run_id column from INTEGER to BIGINT...")
+            cursor.execute("""
+                DO $$
+                BEGIN
+                    -- Check if the column exists and is INTEGER type
+                    IF EXISTS (SELECT 1 FROM information_schema.columns
+                              WHERE table_schema = 'information_extraction'
+                              AND table_name = 'extraction_jobs'
+                              AND column_name = 'databricks_run_id'
+                              AND data_type = 'integer') THEN
+                        -- Alter the column type to BIGINT
+                        ALTER TABLE information_extraction.extraction_jobs
+                        ALTER COLUMN databricks_run_id TYPE BIGINT;
+                    END IF;
+                END $$;
+            """)
+
+            # Add file_content_checksum column to extraction_results table if it doesn't exist
+            logger.info("🔄 Adding file_content_checksum column to extraction_results...")
+            cursor.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                  WHERE table_schema = 'information_extraction'
+                                  AND table_name = 'extraction_results'
+                                  AND column_name = 'file_content_checksum') THEN
+                        ALTER TABLE information_extraction.extraction_results ADD COLUMN file_content_checksum TEXT;
+                    END IF;
+                END $$;
+            """)
+
+            # Add unique constraint for upsert operations (job_id, document_id, schema_id)
+            logger.info("🔄 Adding unique constraint for extraction_results upsert operations...")
+            cursor.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+                                  WHERE table_schema = 'information_extraction'
+                                  AND table_name = 'extraction_results'
+                                  AND constraint_name = 'unique_job_document_schema') THEN
+                        ALTER TABLE information_extraction.extraction_results
+                        ADD CONSTRAINT unique_job_document_schema
+                        UNIQUE (job_id, document_id, schema_id);
                     END IF;
                 END $$;
             """)
@@ -179,6 +234,7 @@ def create_tables() -> None:
                     schema_id INTEGER NOT NULL,
                     extracted_data TEXT NOT NULL,
                     confidence_scores TEXT,
+                    file_content_checksum TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (job_id) REFERENCES information_extraction.extraction_jobs (id),
                     FOREIGN KEY (document_id) REFERENCES information_extraction.documents (id),
@@ -222,6 +278,8 @@ def create_tables() -> None:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_upload_logs_analysis_id ON information_extraction.upload_logs (analysis_id)")
 
             conn.commit()
+            logger.info("✅ Database initialization completed successfully!")
+            logger.info("✅ BIGINT migration for databricks_run_id completed!")
     finally:
         return_db_connection(conn)
 
@@ -448,8 +506,11 @@ def update_extraction_job(job_id: int, updates: Dict[str, Any]) -> bool:
             # Always update updated_at when making changes
             set_clauses.append("updated_at = CURRENT_TIMESTAMP")
 
+            # Exclude only protected/system fields that shouldn't be directly updated
+            protected_fields = {'id', 'created_at', 'updated_at'}
+
             for key, value in updates.items():
-                if key in ['name', 'status', 'error_message', 'completed_at', 'databricks_run_id']:
+                if key not in protected_fields:
                     set_clauses.append(f"{key} = %s")
                     values.append(value)
 
