@@ -3,7 +3,7 @@
  * Based on folio-parse-stream design patterns with Sanabil corporate styling
  */
 
-import { FileText, Upload, BarChart3, X } from 'lucide-react';
+import { FileText, Upload, BarChart3, X, Home, ScrollText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Page } from '../App';
 
@@ -17,6 +17,12 @@ interface AppSidebarProps {
 
 export function AppSidebar({ currentPage, onPageChange, isOpen, onToggle, collapsed = false }: AppSidebarProps) {
   const navItems = [
+    {
+      id: 'dashboard' as Page,
+      label: 'Dashboard',
+      icon: Home,
+      description: 'Overview and recent activity',
+    },
     {
       id: 'schemas' as Page,
       label: 'Schema Management',
@@ -34,6 +40,12 @@ export function AppSidebar({ currentPage, onPageChange, isOpen, onToggle, collap
       label: 'Extraction Results',
       icon: BarChart3,
       description: 'View and export extraction results',
+    },
+    {
+      id: 'logs' as Page,
+      label: 'Activity Logs',
+      icon: ScrollText,
+      description: 'Monitor system activity and logs',
     },
   ];
 

@@ -10,8 +10,10 @@ import { AppHeader } from './components/AppHeader';
 import { SchemasPage } from './pages/SchemasPage';
 import { UploadPage } from './pages/UploadPage';
 import { ResultsPage } from './pages/ResultsPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { ActivityLogsPage } from './pages/ActivityLogsPage';
 
-export type Page = 'schemas' | 'upload' | 'results';
+export type Page = 'dashboard' | 'schemas' | 'upload' | 'results' | 'logs';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -29,8 +31,10 @@ const getCurrentPageFromUrl = (): Page => {
   if (path.includes('/upload')) return 'upload';
   if (path.includes('/results')) return 'results';
   if (path.includes('/schemas')) return 'schemas';
-  // Default to schemas for root path
-  return 'schemas';
+  if (path.includes('/logs')) return 'logs';
+  if (path.includes('/dashboard')) return 'dashboard';
+  // Default to dashboard for root path
+  return 'dashboard';
 };
 
 // Helper function to update URL
@@ -62,14 +66,18 @@ function App() {
 
   const renderPage = () => {
     switch (currentPage) {
+      case 'dashboard':
+        return <DashboardPage onPageChange={handlePageChange} />;
       case 'schemas':
         return <SchemasPage />;
       case 'upload':
         return <UploadPage />;
       case 'results':
         return <ResultsPage />;
+      case 'logs':
+        return <ActivityLogsPage />;
       default:
-        return <SchemasPage />;
+        return <DashboardPage onPageChange={handlePageChange} />;
     }
   };
 

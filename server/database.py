@@ -3,7 +3,6 @@
 import json
 import logging
 import os
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import psycopg2
@@ -11,18 +10,16 @@ import psycopg2.extras
 from psycopg2.pool import SimpleConnectionPool
 
 from server.models import (
-    DBDocument,
-    DBExtractionJob,
-    DBExtractionResult,
-    DBExtractionSchema,
-    Document,
-    ExtractionJob,
-    ExtractionResult,
-    ExtractionSchema,
-    ExtractionSchemaSummary,
-    SchemaField,
+  DBDocument,
+  DBExtractionJob,
+  DBExtractionResult,
+  DBExtractionSchema,
+  Document,
+  ExtractionJob,
+  ExtractionSchema,
+  ExtractionSchemaSummary,
+  SchemaField,
 )
-
 
 # ============================================================================
 # DATABASE CONNECTION
@@ -33,68 +30,65 @@ _connection_pool: Optional[SimpleConnectionPool] = None
 
 
 def get_db_config() -> Dict[str, str]:
-    """Get database configuration from environment variables."""
-    return {
-        'host': os.getenv('DB_HOST', 'localhost'),
-        'port': os.getenv('DB_PORT', '5432'),
-        'database': os.getenv('DB_NAME', 'information_extraction'),
-        'user': os.getenv('DB_USER', 'postgres'),
-        'password': os.getenv('DB_PASSWORD', ''),
-    }
+  """Get database configuration from environment variables."""
+  return {
+    'host': os.getenv('DB_HOST', 'localhost'),
+    'port': os.getenv('DB_PORT', '5432'),
+    'database': os.getenv('DB_NAME', 'information_extraction'),
+    'user': os.getenv('DB_USER', 'postgres'),
+    'password': os.getenv('DB_PASSWORD', ''),
+  }
 
 
 def init_db_pool() -> None:
-    """Initialize the database connection pool."""
-    global _connection_pool
-    if _connection_pool is None:
-        config = get_db_config()
-        _connection_pool = SimpleConnectionPool(
-            minconn=1,
-            maxconn=10,
-            **config
-        )
+  """Initialize the database connection pool."""
+  global _connection_pool
+  if _connection_pool is None:
+    config = get_db_config()
+    _connection_pool = SimpleConnectionPool(minconn=1, maxconn=10, **config)
 
 
 def get_db_connection():
-    """Get a database connection from the pool."""
-    if _connection_pool is None:
-        init_db_pool()
-    return _connection_pool.getconn()
+  """Get a database connection from the pool."""
+  if _connection_pool is None:
+    init_db_pool()
+  return _connection_pool.getconn()
 
 
 def return_db_connection(conn):
-    """Return a database connection to the pool."""
-    if _connection_pool:
-        _connection_pool.putconn(conn)
+  """Return a database connection to the pool."""
+  if _connection_pool:
+    _connection_pool.putconn(conn)
 
 
 def close_db_pool() -> None:
-    """Close all database connections."""
-    global _connection_pool
-    if _connection_pool:
-        _connection_pool.closeall()
-        _connection_pool = None
+  """Close all database connections."""
+  global _connection_pool
+  if _connection_pool:
+    _connection_pool.closeall()
+    _connection_pool = None
 
 
 # ============================================================================
 # DATABASE SCHEMA CREATION
 # ============================================================================
 
+
 def create_tables() -> None:
-    """Create database tables if they don't exist."""
-    logger = logging.getLogger(__name__)
-    logger.info("🔧 Starting database initialization...")
+  """Create database tables if they don't exist."""
+  logger = logging.getLogger(__name__)
+  logger.info('🔧 Starting database initialization...')
 
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            # Create schema if it doesn't exist
-            logger.info("Creating information_extraction schema...")
-            cursor.execute("CREATE SCHEMA IF NOT EXISTS information_extraction")
+  conn = get_db_connection()
+  try:
+    with conn.cursor() as cursor:
+      # Create schema if it doesn't exist
+      logger.info('Creating information_extraction schema...')
+      cursor.execute('CREATE SCHEMA IF NOT EXISTS information_extraction')
 
-            # Create extraction_schemas table (updated to match notebook expectations)
-            logger.info("Creating extraction_schemas table...")
-            cursor.execute("""
+      # Create extraction_schemas table (updated to match notebook expectations)
+      logger.info('Creating extraction_schemas table...')
+      cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.extraction_schemas (
                     id SERIAL PRIMARY KEY,
                     name TEXT NOT NULL,
@@ -105,8 +99,8 @@ def create_tables() -> None:
                 )
             """)
 
-            # Migrate existing schema_definition column to fields column
-            cursor.execute("""
+      # Migrate existing schema_definition column to fields column
+      cursor.execute("""
                 DO $$
                 BEGIN
                     -- Check if schema_definition column exists and fields doesn't
@@ -133,9 +127,9 @@ def create_tables() -> None:
                 END $$;
             """)
 
-            # Create extraction_jobs table (updated with upload_directory)
-            logger.info("Creating extraction_jobs table...")
-            cursor.execute("""
+      # Create extraction_jobs table (updated with upload_directory)
+      logger.info('Creating extraction_jobs table...')
+      cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.extraction_jobs (
                     id SERIAL PRIMARY KEY,
                     name TEXT NOT NULL,
@@ -151,8 +145,8 @@ def create_tables() -> None:
                 )
             """)
 
-            # Add upload_directory column if it doesn't exist
-            cursor.execute("""
+      # Add upload_directory column if it doesn't exist
+      cursor.execute("""
                 DO $$
                 BEGIN
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns
@@ -164,9 +158,48 @@ def create_tables() -> None:
                 END $$;
             """)
 
-            # Migrate databricks_run_id column from INTEGER to BIGINT to support 64-bit run IDs
-            logger.info("🔄 Migrating databricks_run_id column from INTEGER to BIGINT...")
-            cursor.execute("""
+      # Add user tracking columns for auditing
+      logger.info('🔄 Adding user tracking columns for audit trail...')
+      cursor.execute("""
+                DO $$
+                BEGIN
+                    -- Add created_by to extraction_schemas
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                  WHERE table_schema = 'information_extraction'
+                                  AND table_name = 'extraction_schemas'
+                                  AND column_name = 'created_by') THEN
+                        ALTER TABLE information_extraction.extraction_schemas ADD COLUMN created_by VARCHAR(255);
+                    END IF;
+
+                    -- Add created_by to extraction_jobs
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                  WHERE table_schema = 'information_extraction'
+                                  AND table_name = 'extraction_jobs'
+                                  AND column_name = 'created_by') THEN
+                        ALTER TABLE information_extraction.extraction_jobs ADD COLUMN created_by VARCHAR(255);
+                    END IF;
+
+                    -- Add user_id to upload_logs
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                  WHERE table_schema = 'information_extraction'
+                                  AND table_name = 'upload_logs'
+                                  AND column_name = 'user_id') THEN
+                        ALTER TABLE information_extraction.upload_logs ADD COLUMN user_id VARCHAR(255);
+                    END IF;
+
+                    -- Add user_email for better user identification
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                  WHERE table_schema = 'information_extraction'
+                                  AND table_name = 'upload_logs'
+                                  AND column_name = 'user_email') THEN
+                        ALTER TABLE information_extraction.upload_logs ADD COLUMN user_email VARCHAR(255);
+                    END IF;
+                END $$;
+            """)
+
+      # Migrate databricks_run_id column from INTEGER to BIGINT to support 64-bit run IDs
+      logger.info('🔄 Migrating databricks_run_id column from INTEGER to BIGINT...')
+      cursor.execute("""
                 DO $$
                 BEGIN
                     -- Check if the column exists and is INTEGER type
@@ -182,9 +215,9 @@ def create_tables() -> None:
                 END $$;
             """)
 
-            # Add file_content_checksum column to extraction_results table if it doesn't exist
-            logger.info("🔄 Adding file_content_checksum column to extraction_results...")
-            cursor.execute("""
+      # Add file_content_checksum column to extraction_results table if it doesn't exist
+      logger.info('🔄 Adding file_content_checksum column to extraction_results...')
+      cursor.execute("""
                 DO $$
                 BEGIN
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns
@@ -196,9 +229,9 @@ def create_tables() -> None:
                 END $$;
             """)
 
-            # Add unique constraint for upsert operations (job_id, document_id, schema_id)
-            logger.info("🔄 Adding unique constraint for extraction_results upsert operations...")
-            cursor.execute("""
+      # Add unique constraint for upsert operations (job_id, document_id, schema_id)
+      logger.info('🔄 Adding unique constraint for extraction_results upsert operations...')
+      cursor.execute("""
                 DO $$
                 BEGIN
                     IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
@@ -212,8 +245,8 @@ def create_tables() -> None:
                 END $$;
             """)
 
-            # Create documents table
-            cursor.execute("""
+      # Create documents table
+      cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.documents (
                     id SERIAL PRIMARY KEY,
                     job_id INTEGER NOT NULL,
@@ -225,8 +258,8 @@ def create_tables() -> None:
                 )
             """)
 
-            # Create extraction_results table
-            cursor.execute("""
+      # Create extraction_results table
+      cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.extraction_results (
                     id SERIAL PRIMARY KEY,
                     job_id INTEGER NOT NULL,
@@ -242,8 +275,8 @@ def create_tables() -> None:
                 )
             """)
 
-            # Create upload_logs table (required by notebook)
-            cursor.execute("""
+      # Create upload_logs table (required by notebook)
+      cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.upload_logs (
                     id SERIAL PRIMARY KEY,
                     analysis_id INTEGER NOT NULL,
@@ -256,8 +289,8 @@ def create_tables() -> None:
                 )
             """)
 
-            # Create extraction_job_results table (dynamic table created by notebook)
-            cursor.execute("""
+      # Create extraction_job_results table (dynamic table created by notebook)
+      cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.extraction_job_results (
                     row_number INTEGER,
                     analysis_id INTEGER,
@@ -270,86 +303,103 @@ def create_tables() -> None:
                 )
             """)
 
-            # Create indexes for better performance
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON information_extraction.extraction_jobs (status)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_schema_id ON information_extraction.extraction_jobs (schema_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_documents_job_id ON information_extraction.documents (job_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_results_job_id ON information_extraction.extraction_results (job_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_upload_logs_analysis_id ON information_extraction.upload_logs (analysis_id)")
+      # Create indexes for better performance
+      cursor.execute(
+        'CREATE INDEX IF NOT EXISTS idx_jobs_status ON information_extraction.extraction_jobs (status)'
+      )
+      cursor.execute(
+        'CREATE INDEX IF NOT EXISTS idx_jobs_schema_id ON information_extraction.extraction_jobs (schema_id)'
+      )
+      cursor.execute(
+        'CREATE INDEX IF NOT EXISTS idx_documents_job_id ON information_extraction.documents (job_id)'
+      )
+      cursor.execute(
+        'CREATE INDEX IF NOT EXISTS idx_results_job_id ON information_extraction.extraction_results (job_id)'
+      )
+      cursor.execute(
+        'CREATE INDEX IF NOT EXISTS idx_upload_logs_analysis_id ON information_extraction.upload_logs (analysis_id)'
+      )
 
-            conn.commit()
-            logger.info("✅ Database initialization completed successfully!")
-            logger.info("✅ BIGINT migration for databricks_run_id completed!")
-    finally:
-        return_db_connection(conn)
+      conn.commit()
+      logger.info('✅ Database initialization completed successfully!')
+      logger.info('✅ BIGINT migration for databricks_run_id completed!')
+  finally:
+    return_db_connection(conn)
 
 
 def test_db_connection() -> bool:
-    """Test database connection."""
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT 1")
-            result = cursor.fetchone()
-        return_db_connection(conn)
-        return result[0] == 1
-    except Exception:
-        return False
+  """Test database connection."""
+  try:
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+      cursor.execute('SELECT 1')
+      result = cursor.fetchone()
+    return_db_connection(conn)
+    return result[0] == 1
+  except Exception:
+    return False
 
 
 # ============================================================================
 # EXTRACTION SCHEMA OPERATIONS
 # ============================================================================
 
-def create_extraction_schema(schema: DBExtractionSchema) -> int:
-    """Create a new extraction schema and return its ID."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO information_extraction.extraction_schemas (name, description, fields, is_active)
-                VALUES (%s, %s, %s, %s)
+
+def create_extraction_schema(schema: DBExtractionSchema, created_by: str = 'System') -> int:
+  """Create a new extraction schema and return its ID."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor() as cursor:
+      cursor.execute(
+        """
+                INSERT INTO information_extraction.extraction_schemas (name, description, fields, is_active, created_by)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
-            """, (schema.name, schema.description, schema.fields, schema.is_active))
-            schema_id = cursor.fetchone()[0]
-            conn.commit()
-            return schema_id
-    finally:
-        return_db_connection(conn)
+            """,
+        (schema.name, schema.description, schema.fields, schema.is_active, created_by),
+      )
+      schema_id = cursor.fetchone()[0]
+      conn.commit()
+      return schema_id
+  finally:
+    return_db_connection(conn)
 
 
 def get_extraction_schema(schema_id: int) -> Optional[ExtractionSchema]:
-    """Get extraction schema by ID."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            cursor.execute("""
+  """Get extraction schema by ID."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+      cursor.execute(
+        """
                 SELECT id, name, description, fields, is_active, created_at
                 FROM information_extraction.extraction_schemas
                 WHERE id = %s
-            """, (schema_id,))
-            row = cursor.fetchone()
-            if row:
-                fields = json.loads(row['fields'])
-                return ExtractionSchema(
-                    id=row['id'],
-                    name=row['name'],
-                    description=row['description'],
-                    fields=[SchemaField(**field) for field in fields],
-                    is_active=row['is_active'],
-                    created_at=row['created_at']
-                )
-            return None
-    finally:
-        return_db_connection(conn)
+            """,
+        (schema_id,),
+      )
+      row = cursor.fetchone()
+      if row:
+        fields = json.loads(row['fields'])
+        return ExtractionSchema(
+          id=row['id'],
+          name=row['name'],
+          description=row['description'],
+          fields=[SchemaField(**field) for field in fields],
+          is_active=row['is_active'],
+          created_at=row['created_at'],
+        )
+      return None
+  finally:
+    return_db_connection(conn)
 
 
 def get_all_extraction_schemas() -> List[ExtractionSchemaSummary]:
-    """Get all extraction schemas with summary information."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            cursor.execute("""
+  """Get all extraction schemas with summary information."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+      cursor.execute("""
                 SELECT
                     id,
                     name,
@@ -360,116 +410,130 @@ def get_all_extraction_schemas() -> List[ExtractionSchemaSummary]:
                 FROM information_extraction.extraction_schemas
                 ORDER BY created_at DESC
             """)
-            rows = cursor.fetchall()
-            schemas = []
-            for row in rows:
-                fields = json.loads(row['fields'])
-                schemas.append(ExtractionSchemaSummary(
-                    id=row['id'],
-                    name=row['name'],
-                    description=row['description'],
-                    fields_count=len(fields),
-                    is_active=row['is_active'],
-                    created_at=row['created_at']
-                ))
-            return schemas
-    finally:
-        return_db_connection(conn)
+      rows = cursor.fetchall()
+      schemas = []
+      for row in rows:
+        fields = json.loads(row['fields'])
+        schemas.append(
+          ExtractionSchemaSummary(
+            id=row['id'],
+            name=row['name'],
+            description=row['description'],
+            fields_count=len(fields),
+            is_active=row['is_active'],
+            created_at=row['created_at'],
+          )
+        )
+      return schemas
+  finally:
+    return_db_connection(conn)
 
 
 def update_extraction_schema(schema_id: int, updates: Dict[str, Any]) -> bool:
-    """Update extraction schema."""
-    if not updates:
+  """Update extraction schema."""
+  if not updates:
+    return False
+
+  conn = get_db_connection()
+  try:
+    with conn.cursor() as cursor:
+      set_clauses = []
+      values = []
+
+      for key, value in updates.items():
+        if key in ['name', 'description', 'fields', 'is_active']:
+          set_clauses.append(f'{key} = %s')
+          values.append(value)
+
+      if not set_clauses:
         return False
 
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            set_clauses = []
-            values = []
+      values.append(schema_id)
 
-            for key, value in updates.items():
-                if key in ['name', 'description', 'fields', 'is_active']:
-                    set_clauses.append(f"{key} = %s")
-                    values.append(value)
-
-            if not set_clauses:
-                return False
-
-            values.append(schema_id)
-
-            cursor.execute(f"""
+      cursor.execute(
+        f"""
                 UPDATE information_extraction.extraction_schemas
                 SET {', '.join(set_clauses)}
                 WHERE id = %s
-            """, values)
+            """,
+        values,
+      )
 
-            affected_rows = cursor.rowcount
-            conn.commit()
-            return affected_rows > 0
-    finally:
-        return_db_connection(conn)
+      affected_rows = cursor.rowcount
+      conn.commit()
+      return affected_rows > 0
+  finally:
+    return_db_connection(conn)
 
 
 def delete_extraction_schema(schema_id: int) -> bool:
-    """Delete extraction schema."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("DELETE FROM information_extraction.extraction_schemas WHERE id = %s", (schema_id,))
-            affected_rows = cursor.rowcount
-            conn.commit()
-            return affected_rows > 0
-    finally:
-        return_db_connection(conn)
+  """Delete extraction schema."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor() as cursor:
+      cursor.execute(
+        'DELETE FROM information_extraction.extraction_schemas WHERE id = %s', (schema_id,)
+      )
+      affected_rows = cursor.rowcount
+      conn.commit()
+      return affected_rows > 0
+  finally:
+    return_db_connection(conn)
 
 
 # ============================================================================
 # EXTRACTION JOB OPERATIONS
 # ============================================================================
 
-def create_extraction_job(job: DBExtractionJob) -> int:
-    """Create a new extraction job and return its ID."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO information_extraction.extraction_jobs (name, schema_id, status)
-                VALUES (%s, %s, %s)
+
+def create_extraction_job(job: DBExtractionJob, created_by: str = 'System') -> int:
+  """Create a new extraction job and return its ID."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor() as cursor:
+      cursor.execute(
+        """
+                INSERT INTO information_extraction.extraction_jobs (name, schema_id, status, created_by)
+                VALUES (%s, %s, %s, %s)
                 RETURNING id
-            """, (job.name, job.schema_id, job.status))
-            job_id = cursor.fetchone()[0]
-            conn.commit()
-            return job_id
-    finally:
-        return_db_connection(conn)
+            """,
+        (job.name, job.schema_id, job.status, created_by),
+      )
+      job_id = cursor.fetchone()[0]
+      conn.commit()
+      return job_id
+  finally:
+    return_db_connection(conn)
 
 
 def get_extraction_job(job_id: int) -> Optional[ExtractionJob]:
-    """Get extraction job by ID."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            cursor.execute("""
+  """Get extraction job by ID."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+      cursor.execute(
+        """
                 SELECT id, name, schema_id, status, created_at, updated_at,
                        completed_at, error_message, databricks_run_id
                 FROM information_extraction.extraction_jobs
                 WHERE id = %s
-            """, (job_id,))
-            row = cursor.fetchone()
-            if row:
-                return ExtractionJob(**dict(row))
-            return None
-    finally:
-        return_db_connection(conn)
+            """,
+        (job_id,),
+      )
+      row = cursor.fetchone()
+      if row:
+        return ExtractionJob(**dict(row))
+      return None
+  finally:
+    return_db_connection(conn)
 
 
 def get_all_extraction_jobs() -> List[Dict[str, Any]]:
-    """Get all extraction jobs with schema names."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            cursor.execute("""
+  """Get all extraction jobs with schema names."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+      cursor.execute("""
                 SELECT
                     j.id,
                     j.name,
@@ -487,119 +551,134 @@ def get_all_extraction_jobs() -> List[Dict[str, Any]]:
                 ) doc_count ON j.id = doc_count.job_id
                 ORDER BY j.created_at DESC
             """)
-            return [dict(row) for row in cursor.fetchall()]
-    finally:
-        return_db_connection(conn)
+      return [dict(row) for row in cursor.fetchall()]
+  finally:
+    return_db_connection(conn)
 
 
 def update_extraction_job(job_id: int, updates: Dict[str, Any]) -> bool:
-    """Update extraction job."""
-    if not updates:
-        return False
+  """Update extraction job."""
+  if not updates:
+    return False
 
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            set_clauses = []
-            values = []
+  conn = get_db_connection()
+  try:
+    with conn.cursor() as cursor:
+      set_clauses = []
+      values = []
 
-            # Always update updated_at when making changes
-            set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+      # Always update updated_at when making changes
+      set_clauses.append('updated_at = CURRENT_TIMESTAMP')
 
-            # Exclude only protected/system fields that shouldn't be directly updated
-            protected_fields = {'id', 'created_at', 'updated_at'}
+      # Exclude only protected/system fields that shouldn't be directly updated
+      protected_fields = {'id', 'created_at', 'updated_at'}
 
-            for key, value in updates.items():
-                if key not in protected_fields:
-                    set_clauses.append(f"{key} = %s")
-                    values.append(value)
+      for key, value in updates.items():
+        if key not in protected_fields:
+          set_clauses.append(f'{key} = %s')
+          values.append(value)
 
-            values.append(job_id)
+      values.append(job_id)
 
-            cursor.execute(f"""
+      cursor.execute(
+        f"""
                 UPDATE information_extraction.extraction_jobs
                 SET {', '.join(set_clauses)}
                 WHERE id = %s
-            """, values)
+            """,
+        values,
+      )
 
-            affected_rows = cursor.rowcount
-            conn.commit()
-            return affected_rows > 0
-    finally:
-        return_db_connection(conn)
+      affected_rows = cursor.rowcount
+      conn.commit()
+      return affected_rows > 0
+  finally:
+    return_db_connection(conn)
 
 
 # ============================================================================
 # DOCUMENT OPERATIONS
 # ============================================================================
 
+
 def create_document(document: DBDocument) -> int:
-    """Create a new document record and return its ID."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+  """Create a new document record and return its ID."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor() as cursor:
+      cursor.execute(
+        """
                 INSERT INTO information_extraction.documents (job_id, filename, file_path, file_size)
                 VALUES (%s, %s, %s, %s)
                 RETURNING id
-            """, (document.job_id, document.filename, document.file_path, document.file_size))
-            document_id = cursor.fetchone()[0]
-            conn.commit()
-            return document_id
-    finally:
-        return_db_connection(conn)
+            """,
+        (document.job_id, document.filename, document.file_path, document.file_size),
+      )
+      document_id = cursor.fetchone()[0]
+      conn.commit()
+      return document_id
+  finally:
+    return_db_connection(conn)
 
 
 def get_documents_by_job(job_id: int) -> List[Document]:
-    """Get all documents for a job."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            cursor.execute("""
+  """Get all documents for a job."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+      cursor.execute(
+        """
                 SELECT id, job_id, filename, file_path, file_size, upload_time
                 FROM information_extraction.documents
                 WHERE job_id = %s
                 ORDER BY upload_time DESC
-            """, (job_id,))
-            return [Document(**dict(row)) for row in cursor.fetchall()]
-    finally:
-        return_db_connection(conn)
+            """,
+        (job_id,),
+      )
+      return [Document(**dict(row)) for row in cursor.fetchall()]
+  finally:
+    return_db_connection(conn)
 
 
 # ============================================================================
 # EXTRACTION RESULT OPERATIONS
 # ============================================================================
 
+
 def create_extraction_result(result: DBExtractionResult) -> int:
-    """Create a new extraction result and return its ID."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+  """Create a new extraction result and return its ID."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor() as cursor:
+      cursor.execute(
+        """
                 INSERT INTO information_extraction.extraction_results
                 (job_id, document_id, schema_id, extracted_data, confidence_scores)
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
-            """, (
-                result.job_id,
-                result.document_id,
-                result.schema_id,
-                result.extracted_data,
-                result.confidence_scores
-            ))
-            result_id = cursor.fetchone()[0]
-            conn.commit()
-            return result_id
-    finally:
-        return_db_connection(conn)
+            """,
+        (
+          result.job_id,
+          result.document_id,
+          result.schema_id,
+          result.extracted_data,
+          result.confidence_scores,
+        ),
+      )
+      result_id = cursor.fetchone()[0]
+      conn.commit()
+      return result_id
+  finally:
+    return_db_connection(conn)
 
 
 def get_results_by_job(job_id: int) -> List[Dict[str, Any]]:
-    """Get all extraction results for a job."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            cursor.execute("""
+  """Get all extraction results for a job."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+      cursor.execute(
+        """
                 SELECT
                     r.id,
                     r.job_id,
@@ -613,35 +692,49 @@ def get_results_by_job(job_id: int) -> List[Dict[str, Any]]:
                 LEFT JOIN information_extraction.documents d ON r.document_id = d.id
                 WHERE r.job_id = %s
                 ORDER BY r.created_at DESC
-            """, (job_id,))
-            results = []
-            for row in cursor.fetchall():
-                result_dict = dict(row)
-                result_dict['extracted_data'] = json.loads(result_dict['extracted_data'])
-                if result_dict['confidence_scores']:
-                    result_dict['confidence_scores'] = json.loads(result_dict['confidence_scores'])
-                results.append(result_dict)
-            return results
-    finally:
-        return_db_connection(conn)
+            """,
+        (job_id,),
+      )
+      results = []
+      for row in cursor.fetchall():
+        result_dict = dict(row)
+        result_dict['extracted_data'] = json.loads(result_dict['extracted_data'])
+        if result_dict['confidence_scores']:
+          result_dict['confidence_scores'] = json.loads(result_dict['confidence_scores'])
+        results.append(result_dict)
+      return results
+  finally:
+    return_db_connection(conn)
 
 
 # ============================================================================
 # UPLOAD LOG OPERATIONS (required by notebook)
 # ============================================================================
 
-def create_upload_log(analysis_id: int, upload_directory: str, event_type: str = 'upload', message: str = '', details: str = '') -> int:
-    """Create a new upload log entry and return its ID."""
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO information_extraction.upload_logs (analysis_id, upload_directory, event_type, message, details)
-                VALUES (%s, %s, %s, %s, %s)
+
+def create_upload_log(
+  analysis_id: int,
+  upload_directory: str,
+  event_type: str = 'upload',
+  message: str = '',
+  details: str = '',
+  user_id: str = 'System',
+  user_email: str = '',
+) -> int:
+  """Create a new upload log entry and return its ID."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor() as cursor:
+      cursor.execute(
+        """
+                INSERT INTO information_extraction.upload_logs (analysis_id, upload_directory, event_type, message, details, user_id, user_email)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (analysis_id, upload_directory, event_type, message, details))
-            log_id = cursor.fetchone()[0]
-            conn.commit()
-            return log_id
-    finally:
-        return_db_connection(conn)
+            """,
+        (analysis_id, upload_directory, event_type, message, details, user_id, user_email),
+      )
+      log_id = cursor.fetchone()[0]
+      conn.commit()
+      return log_id
+  finally:
+    return_db_connection(conn)
