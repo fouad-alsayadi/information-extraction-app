@@ -12,8 +12,9 @@ import { UploadPage } from './pages/UploadPage';
 import { ResultsPage } from './pages/ResultsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
+import { JobDetailsPage } from './pages/JobDetailsPage';
 
-export type Page = 'dashboard' | 'schemas' | 'upload' | 'results' | 'logs';
+export type Page = 'dashboard' | 'schemas' | 'upload' | 'results' | 'logs' | 'job-details';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -26,32 +27,43 @@ const queryClient = new QueryClient({
 });
 
 // Helper function to get current page from URL
-const getCurrentPageFromUrl = (): Page => {
+const getCurrentPageFromUrl = (): { page: Page; jobId?: number } => {
   const path = window.location.pathname;
-  if (path.includes('/upload')) return 'upload';
-  if (path.includes('/results')) return 'results';
-  if (path.includes('/schemas')) return 'schemas';
-  if (path.includes('/logs')) return 'logs';
-  if (path.includes('/dashboard')) return 'dashboard';
+  if (path.includes('/upload')) return { page: 'upload' };
+  if (path.includes('/results')) return { page: 'results' };
+  if (path.includes('/schemas')) return { page: 'schemas' };
+  if (path.includes('/logs')) return { page: 'logs' };
+  if (path.includes('/dashboard')) return { page: 'dashboard' };
+
+  // Check for job details pattern: /jobs/:id
+  const jobMatch = path.match(/^\/jobs\/(\d+)$/);
+  if (jobMatch) {
+    return { page: 'job-details', jobId: parseInt(jobMatch[1]) };
+  }
+
   // Default to dashboard for root path
-  return 'dashboard';
+  return { page: 'dashboard' };
 };
 
 // Helper function to update URL
-const updateUrl = (page: Page) => {
-  const path = `/${page}`;
+const updateUrl = (page: Page, jobId?: number) => {
+  const path = page === 'job-details' && jobId ? `/jobs/${jobId}` : `/${page}`;
   window.history.pushState(null, '', path);
 };
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>(getCurrentPageFromUrl());
+  const urlState = getCurrentPageFromUrl();
+  const [currentPage, setCurrentPage] = useState<Page>(urlState.page);
+  const [currentJobId, setCurrentJobId] = useState<number | undefined>(urlState.jobId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Handle browser back/forward navigation
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPage(getCurrentPageFromUrl());
+      const urlState = getCurrentPageFromUrl();
+      setCurrentPage(urlState.page);
+      setCurrentJobId(urlState.jobId);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -59,9 +71,10 @@ function App() {
   }, []);
 
   // Update page and URL
-  const handlePageChange = (page: Page) => {
+  const handlePageChange = (page: Page, jobId?: number) => {
     setCurrentPage(page);
-    updateUrl(page);
+    setCurrentJobId(jobId);
+    updateUrl(page, jobId);
   };
 
   const renderPage = () => {
@@ -76,6 +89,12 @@ function App() {
         return <ResultsPage />;
       case 'logs':
         return <ActivityLogsPage />;
+      case 'job-details':
+        return currentJobId ? (
+          <JobDetailsPage jobId={currentJobId} onPageChange={handlePageChange} />
+        ) : (
+          <DashboardPage onPageChange={handlePageChange} />
+        );
       default:
         return <DashboardPage onPageChange={handlePageChange} />;
     }

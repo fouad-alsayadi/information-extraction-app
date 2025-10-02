@@ -100,7 +100,7 @@ const transformJobSummary = (job: JobSummary): JobRun => {
 };
 
 interface ProcessingQueueProps {
-  onPageChange?: (page: 'schemas' | 'upload' | 'results' | 'dashboard') => void;
+  onPageChange?: (page: 'schemas' | 'upload' | 'results' | 'dashboard' | 'job-details', jobId?: number) => void;
 }
 
 export function ProcessingQueue({ onPageChange }: ProcessingQueueProps = {}) {
@@ -120,8 +120,8 @@ export function ProcessingQueue({ onPageChange }: ProcessingQueueProps = {}) {
     onPageChange?.('results');
   };
 
-  const handleViewJob = () => {
-    onPageChange?.('results');
+  const handleViewJob = (job: JobRun) => {
+    onPageChange?.('job-details', job.job_id);
   };
 
   if (isLoading) {

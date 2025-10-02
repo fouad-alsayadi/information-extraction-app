@@ -194,6 +194,31 @@ class ApiClient {
     return response.json();
   }
 
+  async getJobDetails(id: number): Promise<{
+    job: {
+      id: number;
+      name: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+      schema_id: number;
+      databricks_run_id?: number;
+    };
+    documents: Array<{
+      id: number;
+      filename: string;
+      file_size: number;
+      upload_time: string;
+    }>;
+    results: Array<{
+      id: number;
+      document_filename: string;
+      extracted_data: Record<string, any>;
+    }>;
+  }> {
+    return this.request(`/jobs/${id}`);
+  }
+
   async getJobStatus(id: number): Promise<{
     job_id: number;
     status: string;
