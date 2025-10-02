@@ -2,3 +2,31 @@ command: [
   "uvicorn",
   "server.app:app"
 ]
+env:
+  # Application Environment
+  - name: 'PORT'
+    value: '8080'
+  
+  # Database Configuration (Azure Databricks PostgreSQL)
+  - name: 'DB_HOST'
+    value: 'instance-3d40d832-a0b1-4db5-ae28-b68a1f1be773.database.azuredatabricks.net'
+  
+  - name: 'DB_PORT'
+    value: '5432'
+  
+  - name: 'DB_NAME'
+    value: 'portfolio_manager'
+  
+  - name: 'DB_USER'
+    value: 'fouad'
+  
+  # Database Password (using valueFrom for secrets)
+  - name: 'DB_PASSWORD'
+    valueFrom: lakebase_db_password
+
+  # File Upload Configuration
+  - name: 'UPLOAD_BASE_PATH'
+    value: /Volumes/fouad_demos/information_extraction/sanabil_documents
+
+  - name: DATABRICKS_JOB_ID
+    value: '820399633256747'

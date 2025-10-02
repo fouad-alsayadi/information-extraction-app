@@ -135,9 +135,10 @@ async def upload_files(
     if not job:
       raise HTTPException(status_code=404, detail='Job not found')
 
-    if job.status not in ['pending', 'failed']:
+    if job.status not in ['not_submitted', 'uploaded', 'failed']:
       raise HTTPException(
-        status_code=400, detail=f'Cannot upload files to job with status: {job.status}'
+        status_code=400,
+        detail=f'Cannot upload files to job with status: {job.status}',
       )
 
     # Validate files
@@ -156,7 +157,10 @@ async def upload_files(
       if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
           status_code=400,
-          detail=f'File type {file_ext} not supported. Allowed: {", ".join(ALLOWED_EXTENSIONS)}',
+          detail=(
+            f'File type {file_ext} not supported. '
+            f'Allowed: {", ".join(ALLOWED_EXTENSIONS)}'
+          ),
         )
 
       # Read and validate file size
@@ -164,7 +168,10 @@ async def upload_files(
       if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
           status_code=400,
-          detail=f'File {file.filename} is too large. Maximum size: {MAX_FILE_SIZE // 1024 // 1024}MB',
+          detail=(
+            f'File {file.filename} is too large. '
+            f'Maximum size: {MAX_FILE_SIZE // 1024 // 1024}MB'
+          ),
         )
 
       # Upload to UC Volumes
@@ -173,7 +180,8 @@ async def upload_files(
         upload_to_uc_volumes(content, uc_file_path)
       except Exception as e:
         raise HTTPException(
-          status_code=500, detail=f'Failed to upload {file.filename} to UC Volumes: {str(e)}'
+          status_code=500,
+          detail=f'Failed to upload {file.filename} to UC Volumes: {str(e)}',
         )
 
       # Create document record
@@ -189,7 +197,9 @@ async def upload_files(
       total_size += len(content)
 
     # Update job status and upload directory
-    update_extraction_job(job_id, {'status': 'uploaded', 'upload_directory': job_upload_path})
+    update_extraction_job(
+      job_id, {'status': 'uploaded', 'upload_directory': job_upload_path}
+    )
 
     # Create upload log entry (required by notebook)
     user_id = get_user_for_logging(user_context)
@@ -201,7 +211,7 @@ async def upload_files(
       'Files uploaded to UC Volumes',
       '',  # details
       user_id,
-      user_email
+      user_email,
     )
 
     # Trigger Databricks processing
@@ -209,7 +219,9 @@ async def upload_files(
       run_id = await DatabricksService.trigger_extraction_job(job_id, job.schema_id)
 
       # Update job with Databricks run ID and processing status
-      update_extraction_job(job_id, {'status': 'processing', 'databricks_run_id': run_id})
+      update_extraction_job(
+        job_id, {'status': 'processing', 'databricks_run_id': run_id}
+      )
 
     except Exception as e:
       # Update job status to indicate processing trigger failed
@@ -217,7 +229,8 @@ async def upload_files(
         job_id, {'status': 'failed', 'error_message': f'Failed to trigger processing: {str(e)}'}
       )
       raise HTTPException(
-        status_code=500, detail=f'Files uploaded but failed to trigger processing: {str(e)}'
+        status_code=500,
+        detail=f'Files uploaded but failed to trigger processing: {str(e)}',
       )
 
     return FileUploadResponse(

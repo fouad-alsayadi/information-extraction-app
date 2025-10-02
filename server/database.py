@@ -134,7 +134,7 @@ def create_tables() -> None:
                     id SERIAL PRIMARY KEY,
                     name TEXT NOT NULL,
                     schema_id INTEGER NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'pending',
+                    status TEXT NOT NULL DEFAULT 'not_submitted',
                     upload_directory TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -529,7 +529,7 @@ def get_extraction_job(job_id: int) -> Optional[ExtractionJob]:
 
 
 def get_all_extraction_jobs() -> List[Dict[str, Any]]:
-  """Get all extraction jobs with schema names."""
+  """Get all extraction jobs with schema names and proper status logic."""
   conn = get_db_connection()
   try:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
@@ -538,10 +538,17 @@ def get_all_extraction_jobs() -> List[Dict[str, Any]]:
                     j.id,
                     j.name,
                     j.status,
+                    j.databricks_run_id,
                     j.created_at,
                     j.completed_at,
                     s.name as schema_name,
-                    COALESCE(doc_count.count, 0) as documents_count
+                    COALESCE(doc_count.count, 0) as documents_count,
+                    -- Calculate proper status based on databricks_run_id
+                    CASE
+                        WHEN j.databricks_run_id IS NULL AND j.status NOT IN ('failed', 'uploaded')
+                        THEN 'not_submitted'
+                        ELSE j.status
+                    END as computed_status
                 FROM information_extraction.extraction_jobs j
                 LEFT JOIN information_extraction.extraction_schemas s ON j.schema_id = s.id
                 LEFT JOIN (
@@ -551,7 +558,16 @@ def get_all_extraction_jobs() -> List[Dict[str, Any]]:
                 ) doc_count ON j.id = doc_count.job_id
                 ORDER BY j.created_at DESC
             """)
-      return [dict(row) for row in cursor.fetchall()]
+
+      # Convert to list and update status to computed_status
+      jobs = []
+      for row in cursor.fetchall():
+        job_dict = dict(row)
+        job_dict['status'] = job_dict['computed_status']  # Use computed status
+        del job_dict['computed_status']  # Remove computed field
+        jobs.append(job_dict)
+
+      return jobs
   finally:
     return_db_connection(conn)
 

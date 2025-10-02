@@ -3,9 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Eye, ExternalLink } from "lucide-react";
-import { useState, useEffect } from "react";
-import { JobsService } from "@/fastapi_client";
+import { Eye } from "lucide-react";
+import { useJobPolling } from "@/hooks/useJobPolling";
 
 interface JobSummary {
   id: number;
@@ -40,6 +39,10 @@ function getStatusBadge(status: string) {
     return "bg-red-100 text-red-800 border-red-200";
   } else if (statusLower.includes('pending') || statusLower.includes('queued')) {
     return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  } else if (statusLower.includes('not_submitted')) {
+    return "bg-slate-100 text-slate-600 border-slate-200";
+  } else if (statusLower.includes('uploaded')) {
+    return "bg-blue-50 text-blue-600 border-blue-200";
   } else {
     return "bg-gray-100 text-gray-600 border-gray-200";
   }
@@ -60,6 +63,10 @@ const transformJobSummary = (job: JobSummary): JobRun => {
     progress = 50;
   } else if (statusLower === 'pending') {
     progress = 10;
+  } else if (statusLower === 'not_submitted') {
+    progress = 0;
+  } else if (statusLower === 'uploaded') {
+    progress = 5;
   }
 
   let estimatedTime = "";
@@ -71,6 +78,10 @@ const transformJobSummary = (job: JobSummary): JobRun => {
     estimatedTime = "Processing...";
   } else if (statusLower === 'pending') {
     estimatedTime = "Queued";
+  } else if (statusLower === 'not_submitted') {
+    estimatedTime = "Awaiting Upload";
+  } else if (statusLower === 'uploaded') {
+    estimatedTime = "Ready to Process";
   } else {
     estimatedTime = "Unknown";
   }
@@ -93,41 +104,23 @@ interface ProcessingQueueProps {
 }
 
 export function ProcessingQueue({ onPageChange }: ProcessingQueueProps = {}) {
-  const [jobs, setJobs] = useState<JobRun[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { jobs: allJobs, loading: isLoading } = useJobPolling({ pollingInterval: 10000 });
 
-  useEffect(() => {
-    const fetchJobs = async () => {
-      try {
-        setIsLoading(true);
-        const response = await JobsService.getJobsApiJobsGet();
-
-        // Filter to show recent jobs and active jobs
-        const recentJobs = response
-          .filter((job: JobSummary) => {
-            const jobDate = new Date(job.created_at);
-            const daysSinceCreation = (Date.now() - jobDate.getTime()) / (1000 * 60 * 60 * 24);
-            return daysSinceCreation <= 7; // Show jobs from last 7 days
-          })
-          .slice(0, 4) // Show only top 4
-          .map(transformJobSummary);
-
-        setJobs(recentJobs);
-      } catch (error) {
-        console.error('Failed to fetch processing jobs:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchJobs();
-  }, []);
+  // Filter to show recent jobs and active jobs
+  const jobs = allJobs
+    .filter((job: JobSummary) => {
+      const jobDate = new Date(job.created_at);
+      const daysSinceCreation = (Date.now() - jobDate.getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceCreation <= 7; // Show jobs from last 7 days
+    })
+    .slice(0, 4) // Show only top 4
+    .map(transformJobSummary);
 
   const handleViewAll = () => {
     onPageChange?.('results');
   };
 
-  const handleViewJob = (job: JobRun) => {
+  const handleViewJob = () => {
     onPageChange?.('results');
   };
 

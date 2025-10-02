@@ -3,37 +3,19 @@
  * Based on folio-parse-stream design patterns with corporate styling
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Download, Eye, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { apiClient, JobSummary, JobResults, ExtractedResult } from '../lib/api';
+import { apiClient, JobResults, ExtractedResult } from '../lib/api';
+import { useJobPolling } from '@/hooks/useJobPolling';
 
 export function ResultsPage() {
-  const [jobs, setJobs] = useState<JobSummary[]>([]);
+  const { jobs, loading, error, refresh } = useJobPolling({ pollingInterval: 15000 });
   const [selectedJob, setSelectedJob] = useState<JobResults | null>(null);
-  const [loading, setLoading] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Load jobs on mount
-  useEffect(() => {
-    loadJobs();
-  }, []);
-
-  const loadJobs = async () => {
-    try {
-      setLoading(true);
-      const data = await apiClient.getJobs();
-      setJobs(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load jobs');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadJobResults = async (jobId: number) => {
     try {
@@ -56,6 +38,12 @@ export function ResultsPage() {
         return <XCircle className="h-5 w-5 text-destructive" />;
       case 'processing':
         return <Clock className="h-5 w-5 text-info animate-spin" />;
+      case 'pending':
+        return <Clock className="h-5 w-5 text-warning" />;
+      case 'not_submitted':
+        return <AlertCircle className="h-5 w-5 text-muted-foreground" />;
+      case 'uploaded':
+        return <AlertCircle className="h-5 w-5 text-blue-600" />;
       default:
         return <AlertCircle className="h-5 w-5 text-warning" />;
     }
@@ -68,6 +56,12 @@ export function ResultsPage() {
       case 'failed':
         return 'destructive';
       case 'processing':
+        return 'secondary';
+      case 'pending':
+        return 'secondary';
+      case 'not_submitted':
+        return 'outline';
+      case 'uploaded':
         return 'secondary';
       default:
         return 'outline';
@@ -144,7 +138,7 @@ export function ResultsPage() {
             </p>
           </div>
           <Button
-            onClick={loadJobs}
+            onClick={refresh}
             variant="outline"
             className="border-border hover:bg-accent/10"
           >

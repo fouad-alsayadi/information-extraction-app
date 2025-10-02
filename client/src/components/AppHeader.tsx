@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Page } from '../App';
 import { UserService } from '../fastapi_client/services/UserService';
 import type { UserInfo } from '../fastapi_client/models/UserInfo';
+import logoImage from '@/assets/images/sanabil-main-logo.png';
 
 interface AppHeaderProps {
   onMenuClick: () => void;
@@ -70,7 +71,7 @@ export function AppHeader({ onMenuClick, sidebarCollapsed, onSidebarToggle }: Ap
 
           <div className="flex items-center space-x-3">
             <img
-              src="/src/assets/images/sanabil-main-logo.png"
+              src={logoImage}
               alt="Sanabil Investments"
               className="w-64 h-auto"
             />

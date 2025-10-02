@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "start": "npx vite",
-    "dev": "npx vite",
-    "build": "npx vite build",
-    "preview": "npx vite preview",
+    "start": "bunx vite",
+    "dev": "bunx vite",
+    "build": "bunx vite build",
+    "preview": "bunx vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css}\""
   },

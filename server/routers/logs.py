@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-
 @router.get('/logs')
 async def get_logs(
   limit: int = Query(default=200, ge=1, le=1000),
