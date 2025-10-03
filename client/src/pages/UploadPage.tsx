@@ -6,8 +6,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Upload, FileText, AlertCircle, CheckCircle, Clock, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { apiClient, ExtractionSchemaSummary } from '../lib/api';
+import { Card, CardContent } from '@/components/ui/card';
+import { SchemasService, JobsService, ExtractionSchemaSummary } from '../fastapi_client';
 
 export function UploadPage() {
   const [schemas, setSchemas] = useState<ExtractionSchemaSummary[]>([]);
@@ -27,7 +27,7 @@ export function UploadPage() {
 
   const loadSchemas = async () => {
     try {
-      const data = await apiClient.getSchemas();
+      const data = await SchemasService.getSchemasApiSchemasGet();
       setSchemas(data.filter(schema => schema.is_active));
     } catch (err) {
       setError('Failed to load schemas');
@@ -102,7 +102,7 @@ export function UploadPage() {
       setUploadProgress('Creating job...');
 
       // Create job
-      const jobResponse = await apiClient.createJob({
+      const jobResponse = await JobsService.createJobApiJobsPost({
         name: jobName.trim(),
         schema_id: selectedSchema!,
       });
@@ -111,12 +111,14 @@ export function UploadPage() {
       setJobId(newJobId);
       setUploadProgress('Uploading files...');
 
-      // Upload files
-      const uploadResponse = await apiClient.uploadFiles(newJobId, files);
+      // Upload files using auto-generated client
+      const uploadResult = await JobsService.uploadFilesApiJobsJobIdUploadPost(newJobId, {
+        files: files
+      });
 
       setUploadProgress('Processing documents...');
       setSuccess(
-        `Successfully created job and uploaded ${uploadResponse.file_count} files. Processing has started.`
+        `Successfully created job and uploaded ${uploadResult.file_count} files. Processing has started.`
       );
 
       // Reset form

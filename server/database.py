@@ -572,6 +572,51 @@ def get_all_extraction_jobs() -> List[Dict[str, Any]]:
     return_db_connection(conn)
 
 
+def get_extraction_jobs_by_schema(schema_id: int) -> List[Dict[str, Any]]:
+  """Get all extraction jobs for a specific schema ID."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+      cursor.execute("""
+                SELECT
+                    j.id,
+                    j.name,
+                    j.status,
+                    j.databricks_run_id,
+                    j.created_at,
+                    j.completed_at,
+                    s.name as schema_name,
+                    COALESCE(doc_count.count, 0) as documents_count,
+                    -- Calculate proper status based on databricks_run_id
+                    CASE
+                        WHEN j.databricks_run_id IS NULL AND j.status NOT IN ('failed', 'uploaded')
+                        THEN 'not_submitted'
+                        ELSE j.status
+                    END as computed_status
+                FROM information_extraction.extraction_jobs j
+                LEFT JOIN information_extraction.extraction_schemas s ON j.schema_id = s.id
+                LEFT JOIN (
+                    SELECT job_id, COUNT(*) as count
+                    FROM information_extraction.documents
+                    GROUP BY job_id
+                ) doc_count ON j.id = doc_count.job_id
+                WHERE j.schema_id = %s
+                ORDER BY j.created_at DESC
+            """, (schema_id,))
+
+      # Convert to list and update status to computed_status
+      jobs = []
+      for row in cursor.fetchall():
+        job_dict = dict(row)
+        job_dict['status'] = job_dict['computed_status']  # Use computed status
+        del job_dict['computed_status']  # Remove computed field
+        jobs.append(job_dict)
+
+      return jobs
+  finally:
+    return_db_connection(conn)
+
+
 def update_extraction_job(job_id: int, updates: Dict[str, Any]) -> bool:
   """Update extraction job."""
   if not updates:

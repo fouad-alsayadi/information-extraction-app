@@ -14,11 +14,13 @@ from server.database import (
   delete_extraction_schema,
   get_all_extraction_schemas,
   get_extraction_schema,
+  get_extraction_jobs_by_schema,
   update_extraction_schema,
 )
 from server.dependencies.auth import get_current_user_context, get_user_for_logging
 from server.models import (
   DBExtractionSchema,
+  ExtractionJobSummary,
   ExtractionSchema,
   ExtractionSchemaCreate,
   ExtractionSchemaSummary,
@@ -143,3 +145,22 @@ async def delete_schema(schema_id: int):
     raise
   except Exception as e:
     raise HTTPException(status_code=500, detail=f'Failed to delete schema: {str(e)}')
+
+
+@router.get('/schemas/{schema_id}/jobs', response_model=List[ExtractionJobSummary])
+async def get_jobs_by_schema(schema_id: int):
+  """Get all jobs that use a specific schema."""
+  try:
+    # Check if schema exists
+    existing_schema = get_extraction_schema(schema_id)
+    if not existing_schema:
+      raise HTTPException(status_code=404, detail='Schema not found')
+
+    jobs = get_extraction_jobs_by_schema(schema_id)
+    return jobs
+  except HTTPException:
+    raise
+  except Exception as e:
+    logger.error(f'Error fetching jobs for schema {schema_id}: {str(e)}')
+    logger.error(f'Full traceback: {traceback.format_exc()}')
+    raise HTTPException(status_code=500, detail=f'Failed to fetch jobs for schema: {str(e)}')

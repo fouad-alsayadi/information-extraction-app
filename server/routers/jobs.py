@@ -135,7 +135,7 @@ async def upload_files(
     if not job:
       raise HTTPException(status_code=404, detail='Job not found')
 
-    if job.status not in ['not_submitted', 'uploaded', 'failed']:
+    if job.status not in ['not_submitted', 'pending', 'uploaded', 'failed']:
       raise HTTPException(
         status_code=400,
         detail=f'Cannot upload files to job with status: {job.status}',

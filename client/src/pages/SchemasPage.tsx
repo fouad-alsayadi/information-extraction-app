@@ -8,9 +8,13 @@ import { Plus, Edit, Trash2, FileText, Calendar, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { apiClient, ExtractionSchemaSummary, SchemaField } from '../lib/api';
+import { SchemasService, ExtractionSchemaSummary, SchemaField } from '../fastapi_client';
 
-export function SchemasPage() {
+interface SchemasPageProps {
+  onPageChange?: (page: 'schemas' | 'upload' | 'results' | 'dashboard' | 'job-details' | 'schema-details', jobId?: number, schemaId?: number) => void;
+}
+
+export function SchemasPage({ onPageChange }: SchemasPageProps = {}) {
   const [schemas, setSchemas] = useState<ExtractionSchemaSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +28,7 @@ export function SchemasPage() {
   const loadSchemas = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getSchemas();
+      const data = await SchemasService.getSchemasApiSchemasGet();
       setSchemas(data);
       setError(null);
     } catch (err) {
@@ -40,7 +44,7 @@ export function SchemasPage() {
     fields: SchemaField[];
   }) => {
     try {
-      await apiClient.createSchema(schemaData);
+      await SchemasService.createSchemaApiSchemasPost(schemaData);
       setShowCreateModal(false);
       loadSchemas(); // Reload the list
     } catch (err) {
@@ -51,7 +55,7 @@ export function SchemasPage() {
   const handleDeleteSchema = async (id: number, name: string) => {
     if (window.confirm(`Are you sure you want to delete the schema "${name}"?`)) {
       try {
-        await apiClient.deleteSchema(id);
+        await SchemasService.deleteSchemaApiSchemasSchemaIdDelete(id);
         loadSchemas(); // Reload the list
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to delete schema');
@@ -127,7 +131,8 @@ export function SchemasPage() {
             {schemas.map((schema) => (
               <Card
                 key={schema.id}
-                className="bg-card border-border shadow-soft hover:shadow-medium transition-shadow"
+                className="bg-card border-border shadow-soft hover:shadow-medium transition-shadow cursor-pointer"
+                onClick={() => onPageChange?.('schema-details', undefined, schema.id)}
               >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -141,7 +146,10 @@ export function SchemasPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {/* TODO: Edit schema */}}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          /* TODO: Edit schema */
+                        }}
                         className="text-muted-foreground hover:text-foreground"
                         title="Edit schema"
                       >
@@ -150,7 +158,10 @@ export function SchemasPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteSchema(schema.id, schema.name)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSchema(schema.id, schema.name);
+                        }}
                         className="text-muted-foreground hover:text-destructive"
                         title="Delete schema"
                       >

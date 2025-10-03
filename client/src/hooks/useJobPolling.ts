@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { JobsService } from '@/fastapi_client';
-import { apiClient } from '@/lib/api';
 
 interface JobSummary {
   id: number;
@@ -43,7 +42,7 @@ export function useJobPolling(options: UseJobPollingOptions = {}) {
         await Promise.all(
           processingJobs.map(async (job) => {
             try {
-              await apiClient.getJobStatus(job.id);
+              await JobsService.getJobStatusApiJobsJobIdStatusGet(job.id);
             } catch (err) {
               console.warn(`Failed to check status for job ${job.id}:`, err);
             }

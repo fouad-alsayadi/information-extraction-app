@@ -8,7 +8,7 @@ import { ArrowLeft, Loader2, Download, FileText, CheckCircle, XCircle, Clock, Al
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { apiClient } from '@/lib/api';
+import { JobsService } from '../fastapi_client';
 import { Page } from '../App';
 
 interface JobDetailsData {
@@ -55,8 +55,8 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
 
       // Load job details and results in parallel
       const [jobDetailsResponse, jobResultsResponse] = await Promise.all([
-        apiClient.getJobDetails(id),
-        apiClient.getJobResults(id).catch(() => ({ results: [] })) // Fallback to empty results if fails
+        JobsService.getJobApiJobsJobIdGet(id),
+        JobsService.getJobResultsApiJobsJobIdResultsGet(id).catch(() => ({ results: [] })) // Fallback to empty results if fails
       ]);
 
       // Combine the data

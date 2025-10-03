@@ -13,8 +13,9 @@ import { ResultsPage } from './pages/ResultsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
 import { JobDetailsPage } from './pages/JobDetailsPage';
+import { SchemaDetailsPage } from './pages/SchemaDetailsPage';
 
-export type Page = 'dashboard' | 'schemas' | 'upload' | 'results' | 'logs' | 'job-details';
+export type Page = 'dashboard' | 'schemas' | 'upload' | 'results' | 'logs' | 'job-details' | 'schema-details';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -27,13 +28,20 @@ const queryClient = new QueryClient({
 });
 
 // Helper function to get current page from URL
-const getCurrentPageFromUrl = (): { page: Page; jobId?: number } => {
+const getCurrentPageFromUrl = (): { page: Page; jobId?: number; schemaId?: number } => {
   const path = window.location.pathname;
   if (path.includes('/upload')) return { page: 'upload' };
   if (path.includes('/results')) return { page: 'results' };
-  if (path.includes('/schemas')) return { page: 'schemas' };
   if (path.includes('/logs')) return { page: 'logs' };
   if (path.includes('/dashboard')) return { page: 'dashboard' };
+
+  // Check for schema details pattern: /schemas/:id
+  const schemaMatch = path.match(/^\/schemas\/(\d+)$/);
+  if (schemaMatch) {
+    return { page: 'schema-details', schemaId: parseInt(schemaMatch[1]) };
+  }
+
+  if (path.includes('/schemas')) return { page: 'schemas' };
 
   // Check for job details pattern: /jobs/:id
   const jobMatch = path.match(/^\/jobs\/(\d+)$/);
@@ -46,8 +54,15 @@ const getCurrentPageFromUrl = (): { page: Page; jobId?: number } => {
 };
 
 // Helper function to update URL
-const updateUrl = (page: Page, jobId?: number) => {
-  const path = page === 'job-details' && jobId ? `/jobs/${jobId}` : `/${page}`;
+const updateUrl = (page: Page, jobId?: number, schemaId?: number) => {
+  let path: string;
+  if (page === 'job-details' && jobId) {
+    path = `/jobs/${jobId}`;
+  } else if (page === 'schema-details' && schemaId) {
+    path = `/schemas/${schemaId}`;
+  } else {
+    path = `/${page}`;
+  }
   window.history.pushState(null, '', path);
 };
 
@@ -55,6 +70,7 @@ function App() {
   const urlState = getCurrentPageFromUrl();
   const [currentPage, setCurrentPage] = useState<Page>(urlState.page);
   const [currentJobId, setCurrentJobId] = useState<number | undefined>(urlState.jobId);
+  const [currentSchemaId, setCurrentSchemaId] = useState<number | undefined>(urlState.schemaId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -64,6 +80,7 @@ function App() {
       const urlState = getCurrentPageFromUrl();
       setCurrentPage(urlState.page);
       setCurrentJobId(urlState.jobId);
+      setCurrentSchemaId(urlState.schemaId);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -71,10 +88,11 @@ function App() {
   }, []);
 
   // Update page and URL
-  const handlePageChange = (page: Page, jobId?: number) => {
+  const handlePageChange = (page: Page, jobId?: number, schemaId?: number) => {
     setCurrentPage(page);
     setCurrentJobId(jobId);
-    updateUrl(page, jobId);
+    setCurrentSchemaId(schemaId);
+    updateUrl(page, jobId, schemaId);
   };
 
   const renderPage = () => {
@@ -82,7 +100,7 @@ function App() {
       case 'dashboard':
         return <DashboardPage onPageChange={handlePageChange} />;
       case 'schemas':
-        return <SchemasPage />;
+        return <SchemasPage onPageChange={handlePageChange} />;
       case 'upload':
         return <UploadPage />;
       case 'results':
@@ -94,6 +112,12 @@ function App() {
           <JobDetailsPage jobId={currentJobId} onPageChange={handlePageChange} />
         ) : (
           <DashboardPage onPageChange={handlePageChange} />
+        );
+      case 'schema-details':
+        return currentSchemaId ? (
+          <SchemaDetailsPage schemaId={currentSchemaId} onPageChange={handlePageChange} />
+        ) : (
+          <SchemasPage />
         );
       default:
         return <DashboardPage onPageChange={handlePageChange} />;
