@@ -64,12 +64,12 @@ export function RecentActivity() {
 
   if (isLoading) {
     return (
-      <Card className="bg-card border-border shadow-soft">
+      <Card className="bg-card border-border shadow-soft flex flex-col">
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-foreground">Recent Activity</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
+        <CardContent className="h-96 overflow-y-auto space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 p-3 rounded-lg">
               <Skeleton className="h-8 w-8 rounded-full" />
               <div className="flex-1 space-y-2">
@@ -90,24 +90,26 @@ export function RecentActivity() {
 
   if (activities.length === 0) {
     return (
-      <Card className="bg-card border-border shadow-soft">
+      <Card className="bg-card border-border shadow-soft flex flex-col">
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-foreground">Recent Activity</CardTitle>
         </CardHeader>
-        <CardContent className="p-6 text-center">
-          <p className="text-muted-foreground">No recent activity found</p>
-          <p className="text-xs text-muted-foreground mt-1">Activity will appear here as documents are processed</p>
+        <CardContent className="h-96 p-6 text-center flex items-center justify-center">
+          <div>
+            <p className="text-muted-foreground">No recent activity found</p>
+            <p className="text-xs text-muted-foreground mt-1">Activity will appear here as documents are processed</p>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="bg-card border-border shadow-soft">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold text-foreground">Recent Activity</CardTitle>
+    <Card className="bg-card border-border shadow-soft flex flex-col">
+      <CardHeader className="pb-6">
+        <CardTitle className="text-xl font-semibold text-foreground">Recent Activity</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="h-96 overflow-y-auto space-y-2">
         {activities.map((activity) => (
           <div key={activity.id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
             <Avatar className="h-8 w-8">

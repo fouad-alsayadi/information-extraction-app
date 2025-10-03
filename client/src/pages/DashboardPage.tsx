@@ -48,8 +48,8 @@ export function DashboardPage({ onPageChange }: DashboardPageProps) {
 
         {/* Main Content Grid */}
         <div className="grid gap-6 lg:grid-cols-2">
-          <ProcessingQueue onPageChange={onPageChange} />
-          <RecentActivity />
+            <ProcessingQueue onPageChange={onPageChange} />
+            <RecentActivity />
         </div>
 
         {/* Quick Actions */}

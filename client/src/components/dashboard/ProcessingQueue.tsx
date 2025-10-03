@@ -126,8 +126,8 @@ export function ProcessingQueue({ onPageChange }: ProcessingQueueProps = {}) {
 
   if (isLoading) {
     return (
-      <Card className="bg-card border-border shadow-soft">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+      <Card className="bg-card border-border shadow-soft flex flex-col">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
           <div>
             <CardTitle className="text-lg font-semibold text-foreground">Processing Queue</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
@@ -136,8 +136,8 @@ export function ProcessingQueue({ onPageChange }: ProcessingQueueProps = {}) {
           </div>
           <Skeleton className="h-8 w-16" />
         </CardHeader>
-        <CardContent className="space-y-4">
-          {Array.from({ length: 2 }).map((_, i) => (
+        <CardContent className="h-96 overflow-y-auto space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="border border-border rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="space-y-2">
@@ -167,8 +167,8 @@ export function ProcessingQueue({ onPageChange }: ProcessingQueueProps = {}) {
 
   if (jobs.length === 0) {
     return (
-      <Card className="bg-card border-border shadow-soft">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+      <Card className="bg-card border-border shadow-soft flex flex-col">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
           <div>
             <CardTitle className="text-lg font-semibold text-foreground">Processing Queue</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
@@ -179,17 +179,19 @@ export function ProcessingQueue({ onPageChange }: ProcessingQueueProps = {}) {
             View All
           </Button>
         </CardHeader>
-        <CardContent className="p-6 text-center">
-          <p className="text-muted-foreground">No recent processing jobs</p>
-          <p className="text-xs text-muted-foreground mt-1">Jobs will appear here when documents are being processed</p>
+        <CardContent className="h-96 p-6 text-center flex items-center justify-center">
+          <div>
+            <p className="text-muted-foreground">No recent processing jobs</p>
+            <p className="text-xs text-muted-foreground mt-1">Jobs will appear here when documents are being processed</p>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="bg-card border-border shadow-soft">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+    <Card className="bg-card border-border shadow-soft flex flex-col">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
         <div>
           <CardTitle className="text-lg font-semibold text-foreground">Processing Queue</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
@@ -200,7 +202,7 @@ export function ProcessingQueue({ onPageChange }: ProcessingQueueProps = {}) {
           View All
         </Button>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="h-96 overflow-y-auto space-y-2">
         {jobs.map((job) => (
           <div key={job.id} className="border border-border rounded-lg p-4 hover:shadow-soft transition-all duration-200">
             <div className="flex items-center justify-between mb-3">
