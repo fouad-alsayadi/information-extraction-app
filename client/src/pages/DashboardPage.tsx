@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, Plus, BarChart3 } from 'lucide-react';
 
 interface DashboardPageProps {
-  onPageChange: (page: 'schemas' | 'upload' | 'results' | 'dashboard') => void;
+  onPageChange: (page: 'schemas' | 'upload' | 'results' | 'dashboard' | 'job-details', jobId?: number) => void;
 }
 
 export function DashboardPage({ onPageChange }: DashboardPageProps) {

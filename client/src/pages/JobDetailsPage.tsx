@@ -4,9 +4,10 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, FileText, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api';
 import { Page } from '../App';
 
@@ -18,6 +19,8 @@ interface JobDetailsData {
     created_at: string;
     updated_at: string;
     schema_id: number;
+    schema_name?: string;
+    databricks_run_id?: number;
   };
   documents: Array<{
     id: number;
@@ -26,9 +29,9 @@ interface JobDetailsData {
     upload_time: string;
   }>;
   results: Array<{
-    id: number;
     document_filename: string;
     extracted_data: Record<string, any>;
+    confidence_scores?: Record<string, number>;
   }>;
 }
 
@@ -49,8 +52,21 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
   const loadJobDetails = async (id: number) => {
     try {
       setLoading(true);
-      const response = await apiClient.getJobDetails(id);
-      setJobData(response);
+
+      // Load job details and results in parallel
+      const [jobDetailsResponse, jobResultsResponse] = await Promise.all([
+        apiClient.getJobDetails(id),
+        apiClient.getJobResults(id).catch(() => ({ results: [] })) // Fallback to empty results if fails
+      ]);
+
+      // Combine the data
+      const combinedData: JobDetailsData = {
+        job: jobDetailsResponse.job,
+        documents: jobDetailsResponse.documents,
+        results: jobResultsResponse.results || []
+      };
+
+      setJobData(combinedData);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load job details');
@@ -61,6 +77,96 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
 
   const handleBack = () => {
     onPageChange?.('results');
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case 'failed':
+        return <XCircle className="h-5 w-5 text-red-600" />;
+      case 'processing':
+        return <Clock className="h-5 w-5 text-blue-600 animate-spin" />;
+      case 'pending':
+        return <Clock className="h-5 w-5 text-yellow-600" />;
+      case 'not_submitted':
+        return <AlertCircle className="h-5 w-5 text-gray-500" />;
+      case 'uploaded':
+        return <AlertCircle className="h-5 w-5 text-blue-600" />;
+      default:
+        return <AlertCircle className="h-5 w-5 text-gray-500" />;
+    }
+  };
+
+  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case 'completed':
+        return 'default';
+      case 'failed':
+        return 'destructive';
+      case 'processing':
+        return 'secondary';
+      case 'pending':
+        return 'secondary';
+      case 'not_submitted':
+        return 'outline';
+      case 'uploaded':
+        return 'secondary';
+      default:
+        return 'outline';
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const exportResults = (results: JobDetailsData['results'], format: 'json' | 'csv') => {
+    if (format === 'json') {
+      const dataStr = JSON.stringify(results, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `extraction-results-${jobData?.job.name}-${Date.now()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } else if (format === 'csv') {
+      if (results.length === 0) return;
+
+      const firstResult = results[0];
+      const headers = ['document_filename', ...Object.keys(firstResult.extracted_data)];
+
+      const csvContent = [
+        headers.join(','),
+        ...results.map(result => {
+          const row = [
+            `"${result.document_filename}"`,
+            ...headers.slice(1).map(header => {
+              const value = result.extracted_data[header];
+              return typeof value === 'string' ? `"${value}"` : String(value || '');
+            })
+          ];
+          return row.join(',');
+        })
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `extraction-results-${jobData?.job.name}-${Date.now()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
   };
 
   if (loading) {
@@ -139,8 +245,8 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
   }
 
   return (
-    <div className="p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="p-6 pl-8">
+      <div className="max-w-7xl">
         {/* Header with Back Button and Job Name */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
@@ -150,90 +256,238 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
               className="mr-4"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              Back to Results
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-corporate">
-                {jobData.job.name}
-              </h1>
+              <div className="flex items-center gap-3">
+                {getStatusIcon(jobData.job.status)}
+                <h1 className="text-3xl font-bold text-corporate">
+                  {jobData.job.name}
+                </h1>
+                <Badge variant={getStatusVariant(jobData.job.status)}>
+                  {jobData.job.status}
+                </Badge>
+              </div>
               <p className="text-muted-foreground mt-1">
-                Job Details • ID: {jobData.job.id}
+                Job ID: {jobData.job.id} • Schema: {jobData.job.schema_name || 'Unknown'}
               </p>
             </div>
           </div>
 
-          {/* Placeholder for future action buttons */}
-          <div className="flex gap-2">
-            <Button variant="outline" disabled>
-              Actions Coming Soon
-            </Button>
-          </div>
+          {/* Export Actions */}
+          {jobData.results.length > 0 && (
+            <div className="flex gap-2">
+              <Button
+                onClick={() => exportResults(jobData.results, 'csv')}
+                variant="outline"
+                size="sm"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button
+                onClick={() => exportResults(jobData.results, 'json')}
+                variant="outline"
+                size="sm"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export JSON
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Job Overview - Placeholder */}
-          <Card className="lg:col-span-1 bg-card border-border shadow-soft">
+        {/* Job Overview and Files - Side by Side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Job Overview */}
+          <Card className="bg-card border-border shadow-soft">
             <CardHeader>
               <CardTitle className="text-lg text-foreground">Job Overview</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Status:</span>
-                  <p className="text-foreground">{jobData.job.status}</p>
-                </div>
-                <div>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                <div className="flex justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Created:</span>
-                  <p className="text-foreground">
+                  <span className="text-sm text-foreground font-medium">
                     {new Date(jobData.job.created_at).toLocaleDateString()}
-                  </p>
+                  </span>
                 </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Files:</span>
-                  <p className="text-foreground">{jobData.documents.length} documents</p>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Last Updated:</span>
+                  <span className="text-sm text-foreground font-medium">
+                    {new Date(jobData.job.updated_at).toLocaleDateString()}
+                  </span>
                 </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Results:</span>
-                  <p className="text-foreground">{jobData.results.length} processed</p>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Files Uploaded:</span>
+                  <span className="text-sm text-foreground font-medium">{jobData.documents.length} documents</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Results Generated:</span>
+                  <span className="text-sm text-foreground font-medium">{jobData.results.length} processed</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Schema ID:</span>
+                  <span className="text-sm text-foreground font-medium">{jobData.job.schema_id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Schema Fields:</span>
+                  <span className="text-sm text-foreground font-medium">
+                    {jobData.results.length > 0 ? Object.keys(jobData.results[0].extracted_data).length : 'N/A'} fields
+                  </span>
+                </div>
+                {jobData.job.databricks_run_id && (
+                  <div className="col-span-2 pt-3 border-t border-border">
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm font-medium text-muted-foreground">Databricks Run ID:</span>
+                      <span className="text-foreground font-medium text-xs font-mono break-all text-right max-w-[60%]">
+                        {jobData.job.databricks_run_id}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Files and Results - Placeholder */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Files Placeholder */}
-            <Card className="bg-card border-border shadow-soft">
-              <CardHeader>
-                <CardTitle className="text-lg text-foreground">Uploaded Files</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  File list will be implemented in the next step
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Found {jobData.documents.length} files
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Results Placeholder */}
-            <Card className="bg-card border-border shadow-soft">
-              <CardHeader>
-                <CardTitle className="text-lg text-foreground">Extraction Results</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Results display will be implemented in upcoming steps
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Found {jobData.results.length} results
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Uploaded Files */}
+          <Card className="bg-card border-border shadow-soft">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg text-foreground">
+                <FileText className="h-5 w-5" />
+                Uploaded Files ({jobData.documents.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {jobData.documents.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No files uploaded yet</p>
+              ) : (
+                <div className="max-h-80 overflow-y-auto">
+                  <table className="min-w-full divide-y divide-border">
+                    <thead className="bg-muted/50 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          File Name
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Size
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Uploaded
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-background divide-y divide-border">
+                      {jobData.documents.map((doc) => (
+                        <tr key={doc.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-3 text-sm">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <span className="font-medium text-foreground truncate">{doc.filename}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {formatFileSize(doc.file_size)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {new Date(doc.upload_time).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Extraction Results - Two Column Layout */}
+        <Card className="bg-card border-border shadow-soft">
+          <CardHeader>
+            <CardTitle className="text-lg text-foreground">
+              Extraction Results ({jobData.results.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {jobData.results.length === 0 ? (
+              <div className="text-center py-12 bg-muted/30 rounded-lg">
+                <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-2 text-sm font-medium text-foreground">No results yet</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {jobData.job.status === 'processing'
+                    ? 'Results will appear here when processing is complete'
+                    : 'No extraction results found for this job'}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {jobData.results.map((result, index) => (
+                  <Card key={index} className="bg-background border-border">
+                    <CardHeader>
+                      <CardTitle className="text-base text-foreground flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        {result.document_filename}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-border">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
+                                Field
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
+                                Value
+                              </th>
+                              {result.confidence_scores && (
+                                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
+                                  Confidence
+                                </th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody className="bg-background divide-y divide-border">
+                            {Object.entries(result.extracted_data).map(([field, value]) => (
+                              <tr key={field}>
+                                <td className="px-4 py-3 text-sm font-medium text-foreground">
+                                  {field}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-muted-foreground break-words">
+                                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                </td>
+                                {result.confidence_scores && (
+                                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                                    {result.confidence_scores[field] ? (
+                                      <Badge
+                                        variant={
+                                          result.confidence_scores[field] >= 0.8
+                                            ? 'default'
+                                            : result.confidence_scores[field] >= 0.6
+                                            ? 'secondary'
+                                            : 'destructive'
+                                        }
+                                      >
+                                        {Math.round(result.confidence_scores[field] * 100)}%
+                                      </Badge>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

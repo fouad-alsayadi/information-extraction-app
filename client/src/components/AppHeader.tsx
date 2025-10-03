@@ -42,7 +42,7 @@ export function AppHeader({ onMenuClick, sidebarCollapsed, onSidebarToggle }: Ap
     fetchUserInfo();
   }, []);
   return (
-    <header className="h-16 bg-card/50 backdrop-blur-sm border-b border-border shadow-soft">
+    <header className="h-20 bg-card/50 backdrop-blur-sm border-b border-border shadow-soft">
       <div className="flex items-center justify-between px-4 h-full">
         {/* Left Side - Menu + Logo + Title */}
         <div className="flex items-center space-x-4">

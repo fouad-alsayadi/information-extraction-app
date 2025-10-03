@@ -86,7 +86,7 @@ function App() {
       case 'upload':
         return <UploadPage />;
       case 'results':
-        return <ResultsPage />;
+        return <ResultsPage onPageChange={handlePageChange} />;
       case 'logs':
         return <ActivityLogsPage />;
       case 'job-details':
