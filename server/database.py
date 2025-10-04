@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import traceback
 from typing import Any, Dict, List, Optional
 
 import psycopg2
@@ -145,7 +146,79 @@ def create_tables() -> None:
                 )
             """)
 
-      # Add upload_directory column if it doesn't exist
+      # === TABLE CREATION FIRST ===
+
+
+
+
+
+      # Create documents table
+      cursor.execute("""
+                CREATE TABLE IF NOT EXISTS information_extraction.documents (
+                    id SERIAL PRIMARY KEY,
+                    job_id INTEGER NOT NULL,
+                    filename TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    file_size INTEGER NOT NULL,
+                    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (job_id) REFERENCES information_extraction.extraction_jobs (id)
+                )
+            """)
+
+      # Create extraction_results table
+      cursor.execute("""
+                CREATE TABLE IF NOT EXISTS information_extraction.extraction_results (
+                    id SERIAL PRIMARY KEY,
+                    job_id INTEGER NOT NULL,
+                    document_id INTEGER NOT NULL,
+                    schema_id INTEGER NOT NULL,
+                    extracted_data TEXT NOT NULL,
+                    confidence_scores TEXT,
+                    file_content_checksum TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (job_id) REFERENCES information_extraction.extraction_jobs (id),
+                    FOREIGN KEY (document_id) REFERENCES information_extraction.documents (id),
+                    FOREIGN KEY (schema_id) REFERENCES information_extraction.extraction_schemas (id)
+                )
+            """)
+
+      # Create upload_logs table (required by notebook)
+      cursor.execute("""
+                CREATE TABLE IF NOT EXISTS information_extraction.upload_logs (
+                    id SERIAL PRIMARY KEY,
+                    analysis_id INTEGER NOT NULL,
+                    upload_directory TEXT NOT NULL,
+                    event_type TEXT DEFAULT 'upload',
+                    message TEXT,
+                    details TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (analysis_id) REFERENCES information_extraction.extraction_jobs (id)
+                )
+            """)
+
+
+      # Create indexes for better performance
+      cursor.execute(
+        'CREATE INDEX IF NOT EXISTS idx_jobs_status ON information_extraction.extraction_jobs (status)'
+      )
+      cursor.execute(
+        'CREATE INDEX IF NOT EXISTS idx_jobs_schema_id ON information_extraction.extraction_jobs (schema_id)'
+      )
+      cursor.execute(
+        'CREATE INDEX IF NOT EXISTS idx_documents_job_id ON information_extraction.documents (job_id)'
+      )
+      cursor.execute(
+        'CREATE INDEX IF NOT EXISTS idx_results_job_id ON information_extraction.extraction_results (job_id)'
+      )
+      cursor.execute(
+        'CREATE INDEX IF NOT EXISTS idx_upload_logs_analysis_id ON information_extraction.upload_logs (analysis_id)'
+      )
+
+      # === DATABASE MIGRATIONS (Run after all tables are created) ===
+      logger.info('🔄 Running database migrations after table creation...')
+
+      # Add upload_directory column to extraction_jobs if it doesn't exist
+      logger.info('🔄 Adding upload_directory column to extraction_jobs...')
       cursor.execute("""
                 DO $$
                 BEGIN
@@ -245,84 +318,14 @@ def create_tables() -> None:
                 END $$;
             """)
 
-      # Create documents table
-      cursor.execute("""
-                CREATE TABLE IF NOT EXISTS information_extraction.documents (
-                    id SERIAL PRIMARY KEY,
-                    job_id INTEGER NOT NULL,
-                    filename TEXT NOT NULL,
-                    file_path TEXT NOT NULL,
-                    file_size INTEGER NOT NULL,
-                    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (job_id) REFERENCES information_extraction.extraction_jobs (id)
-                )
-            """)
-
-      # Create extraction_results table
-      cursor.execute("""
-                CREATE TABLE IF NOT EXISTS information_extraction.extraction_results (
-                    id SERIAL PRIMARY KEY,
-                    job_id INTEGER NOT NULL,
-                    document_id INTEGER NOT NULL,
-                    schema_id INTEGER NOT NULL,
-                    extracted_data TEXT NOT NULL,
-                    confidence_scores TEXT,
-                    file_content_checksum TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (job_id) REFERENCES information_extraction.extraction_jobs (id),
-                    FOREIGN KEY (document_id) REFERENCES information_extraction.documents (id),
-                    FOREIGN KEY (schema_id) REFERENCES information_extraction.extraction_schemas (id)
-                )
-            """)
-
-      # Create upload_logs table (required by notebook)
-      cursor.execute("""
-                CREATE TABLE IF NOT EXISTS information_extraction.upload_logs (
-                    id SERIAL PRIMARY KEY,
-                    analysis_id INTEGER NOT NULL,
-                    upload_directory TEXT NOT NULL,
-                    event_type TEXT DEFAULT 'upload',
-                    message TEXT,
-                    details TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (analysis_id) REFERENCES information_extraction.extraction_jobs (id)
-                )
-            """)
-
-      # Create extraction_job_results table (dynamic table created by notebook)
-      cursor.execute("""
-                CREATE TABLE IF NOT EXISTS information_extraction.extraction_job_results (
-                    row_number INTEGER,
-                    analysis_id INTEGER,
-                    schema_id INTEGER,
-                    path TEXT,
-                    extracted_fields TEXT,
-                    PRIMARY KEY (row_number, analysis_id, schema_id),
-                    FOREIGN KEY (analysis_id) REFERENCES information_extraction.extraction_jobs (id),
-                    FOREIGN KEY (schema_id) REFERENCES information_extraction.extraction_schemas (id)
-                )
-            """)
-
-      # Create indexes for better performance
-      cursor.execute(
-        'CREATE INDEX IF NOT EXISTS idx_jobs_status ON information_extraction.extraction_jobs (status)'
-      )
-      cursor.execute(
-        'CREATE INDEX IF NOT EXISTS idx_jobs_schema_id ON information_extraction.extraction_jobs (schema_id)'
-      )
-      cursor.execute(
-        'CREATE INDEX IF NOT EXISTS idx_documents_job_id ON information_extraction.documents (job_id)'
-      )
-      cursor.execute(
-        'CREATE INDEX IF NOT EXISTS idx_results_job_id ON information_extraction.extraction_results (job_id)'
-      )
-      cursor.execute(
-        'CREATE INDEX IF NOT EXISTS idx_upload_logs_analysis_id ON information_extraction.upload_logs (analysis_id)'
-      )
-
       conn.commit()
       logger.info('✅ Database initialization completed successfully!')
       logger.info('✅ BIGINT migration for databricks_run_id completed!')
+  except Exception as e:
+    logger.error(f'❌ Database initialization failed: {str(e)}')
+    logger.error(f'❌ Full traceback: {traceback.format_exc()}')
+    conn.rollback()
+    raise
   finally:
     return_db_connection(conn)
 
