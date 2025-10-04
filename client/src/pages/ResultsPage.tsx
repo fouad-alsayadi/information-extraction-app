@@ -15,7 +15,7 @@ interface ResultsPageProps {
 }
 
 export function ResultsPage({ onPageChange }: ResultsPageProps = {}) {
-  const { jobs, loading, error, refresh } = useJobPolling({ pollingInterval: 15000 });
+  const { jobs, loading, error, refresh } = useJobPolling({ pollingInterval: 30000 });
 
   const getStatusIcon = (status: string) => {
     switch (status) {

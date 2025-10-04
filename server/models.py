@@ -256,7 +256,7 @@ class DBExtractionJob(BaseModel):
   id: Optional[int] = None
   name: str
   schema_id: int
-  status: str = 'pending'
+  status: str = 'not_submitted'
   created_at: Optional[datetime] = None
   updated_at: Optional[datetime] = None
   completed_at: Optional[datetime] = None

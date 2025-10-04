@@ -104,7 +104,7 @@ interface ProcessingQueueProps {
 }
 
 export function ProcessingQueue({ onPageChange }: ProcessingQueueProps = {}) {
-  const { jobs: allJobs, loading: isLoading } = useJobPolling({ pollingInterval: 10000 });
+  const { jobs: allJobs, loading: isLoading } = useJobPolling({ pollingInterval: 45000 });
 
   // Filter to show recent jobs and active jobs
   const jobs = allJobs

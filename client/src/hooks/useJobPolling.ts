@@ -17,7 +17,7 @@ interface UseJobPollingOptions {
 }
 
 export function useJobPolling(options: UseJobPollingOptions = {}) {
-  const { pollingInterval = 15000, enabled = true } = options;
+  const { pollingInterval = 30000, enabled = true } = options;
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

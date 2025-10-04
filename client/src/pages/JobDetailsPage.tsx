@@ -125,7 +125,7 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const exportResults = (results: JobDetailsData['results'], format: 'json' | 'csv') => {
+  const exportResults = (results: JobDetailsData['results'], format: 'json' | 'excel') => {
     if (format === 'json') {
       const dataStr = JSON.stringify(results, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
@@ -137,35 +137,60 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-    } else if (format === 'csv') {
+    } else if (format === 'excel') {
       if (results.length === 0) return;
 
-      const firstResult = results[0];
-      const headers = ['document_filename', ...Object.keys(firstResult.extracted_data)];
+      // Import xlsx library dynamically
+      import('xlsx').then((XLSX) => {
+        const firstResult = results[0];
+        const headers = ['document_filename', ...Object.keys(firstResult.extracted_data)];
 
-      const csvContent = [
-        headers.join(','),
-        ...results.map(result => {
-          const row = [
-            `"${result.document_filename}"`,
+        // Prepare data for Excel
+        const worksheetData = [
+          headers, // Header row
+          ...results.map(result => [
+            result.document_filename,
             ...headers.slice(1).map(header => {
               const value = result.extracted_data[header];
-              return typeof value === 'string' ? `"${value}"` : String(value || '');
+              return value || '';
             })
-          ];
-          return row.join(',');
-        })
-      ].join('\n');
+          ])
+        ];
 
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `extraction-results-${jobData?.job.name}-${Date.now()}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+        // Create workbook and worksheet
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+
+        // Auto-size columns
+        const colWidths = headers.map((header, colIndex) => {
+          const maxLength = Math.max(
+            header.length,
+            ...worksheetData.slice(1).map(row => String(row[colIndex] || '').length)
+          );
+          return { wch: Math.min(maxLength + 2, 50) }; // Max width 50, min header length + 2
+        });
+        worksheet['!cols'] = colWidths;
+
+        // Add worksheet to workbook
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Extraction Results');
+
+        // Generate Excel file and download
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([excelBuffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `extraction-results-${jobData?.job.name}-${Date.now()}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }).catch(error => {
+        console.error('Failed to load Excel export library:', error);
+      });
     }
   };
 
@@ -278,12 +303,12 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
           {jobData.results.length > 0 && (
             <div className="flex gap-2">
               <Button
-                onClick={() => exportResults(jobData.results, 'csv')}
+                onClick={() => exportResults(jobData.results, 'excel')}
                 variant="outline"
                 size="sm"
               >
                 <Download className="h-4 w-4 mr-2" />
-                Export CSV
+                Export Excel
               </Button>
               <Button
                 onClick={() => exportResults(jobData.results, 'json')}
