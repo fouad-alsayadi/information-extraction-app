@@ -3,28 +3,35 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect } from "react";
-import { DashboardService } from "@/fastapi_client";
+import { LogsService } from "@/fastapi_client";
 
-interface Activity {
+interface ActivityEntry {
   id: string;
-  user: string;
-  action: string;
-  schema: string;
   timestamp: string;
-  type: string;
-  job_id: number;
+  activity_type: string;
+  message: string;
+  details: string;
+  user: string;
 }
 
-function getActivityBadge(type: string) {
+interface ActivitiesResponse {
+  logs: ActivityEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+function getActivityBadge(activityType: string) {
   const variants = {
-    success: "bg-green-100 text-green-700 border-green-200",
-    process: "bg-blue-100 text-blue-700 border-blue-200",
-    error: "bg-red-100 text-red-700 border-red-200",
-    upload: "bg-purple-100 text-purple-700 border-purple-200",
-    update: "bg-gray-100 text-gray-700 border-gray-200",
+    "Upload": "bg-blue-100 text-blue-800",
+    "Export": "bg-green-100 text-green-800",
+    "Job Creation": "bg-purple-100 text-purple-800",
+    "Job Completion": "bg-emerald-100 text-emerald-800",
+    "Job Failure": "bg-red-100 text-red-800",
+    "Schema Creation": "bg-orange-100 text-orange-800",
   } as const;
 
-  return variants[type as keyof typeof variants] || variants.update;
+  return variants[activityType as keyof typeof variants] || "bg-gray-100 text-gray-800";
 }
 
 function formatRelativeTime(timestamp: string): string {
@@ -43,15 +50,15 @@ function formatRelativeTime(timestamp: string): string {
 }
 
 export function RecentActivity() {
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchActivities = async () => {
+    const loadActivities = async () => {
       try {
         setIsLoading(true);
-        const response = await DashboardService.getRecentActivityApiDashboardRecentActivityGet();
-        setActivities(response.activities || []);
+        const response = await LogsService.getLogsApiLogsGet(10) as ActivitiesResponse;
+        setActivities(response.logs || []);
       } catch (error) {
         console.error('Failed to fetch recent activities:', error);
       } finally {
@@ -59,7 +66,7 @@ export function RecentActivity() {
       }
     };
 
-    fetchActivities();
+    loadActivities();
   }, []);
 
   if (isLoading) {
@@ -120,12 +127,14 @@ export function RecentActivity() {
             <div className="flex-1 space-y-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">{activity.user}</span>
-                <Badge className={`text-xs px-2 py-0.5 ${getActivityBadge(activity.type)}`}>
-                  {activity.type}
+                <Badge className={`text-xs px-2 py-0.5 ${getActivityBadge(activity.activity_type)}`}>
+                  {activity.activity_type}
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground">{activity.action}</p>
-              <p className="text-xs text-accent font-medium">{activity.schema}</p>
+              <p className="text-sm text-muted-foreground">{activity.message}</p>
+              {activity.details && (
+                <p className="text-xs text-accent font-medium">{activity.details}</p>
+              )}
             </div>
             <div className="text-xs text-muted-foreground">
               {formatRelativeTime(activity.timestamp)}

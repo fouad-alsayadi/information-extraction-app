@@ -113,7 +113,7 @@ export function AppSidebar({ currentPage, onPageChange, isOpen, onToggle, collap
             <div className="text-center">
               <p className="text-xs text-muted-foreground leading-tight">
                 Powered by Databricks<br/>
-                © 2024 Sanabil Investments
+                © 2025 Sanabil Investments
               </p>
             </div>
           </div>
