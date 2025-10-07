@@ -8,7 +8,7 @@ import { ArrowLeft, Loader2, Download, FileText, CheckCircle, XCircle, Clock, Al
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { JobsService } from '../fastapi_client';
+import { JobsService, LogsService } from '../fastapi_client';
 import { Page } from '../App';
 
 interface JobDetailsData {
@@ -128,23 +128,36 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const exportResults = (results: JobDetailsData['results'], format: 'json' | 'excel') => {
+  const exportResults = async (results: JobDetailsData['results'], format: 'json' | 'excel') => {
+    const filename = `extraction-results-${jobData?.job.name}-${Date.now()}.${format}`;
+
     if (format === 'json') {
       const dataStr = JSON.stringify(results, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `extraction-results-${jobData?.job.name}-${Date.now()}.json`;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
+      // Log the export event
+      try {
+        await LogsService.logExportEventApiLogsExportPost(
+          jobId,
+          filename,
+          results.length
+        );
+      } catch (error) {
+        console.error('Failed to log export event:', error);
+      }
     } else if (format === 'excel') {
       if (results.length === 0) return;
 
       // Import xlsx library dynamically
-      import('xlsx').then((XLSX) => {
+      import('xlsx').then(async (XLSX) => {
         const firstResult = results[0];
         const headers = ['document_filename', ...Object.keys(firstResult.extracted_data)];
 
@@ -186,11 +199,22 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `extraction-results-${jobData?.job.name}-${Date.now()}.xlsx`;
+        link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+
+        // Log the export event
+        try {
+          await LogsService.logExportEventApiLogsExportPost(
+            jobId,
+            filename,
+            results.length
+          );
+        } catch (error) {
+          console.error('Failed to log export event:', error);
+        }
       }).catch(error => {
         console.error('Failed to load Excel export library:', error);
       });
