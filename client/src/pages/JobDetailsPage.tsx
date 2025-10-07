@@ -129,7 +129,8 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
   };
 
   const exportResults = async (results: JobDetailsData['results'], format: 'json' | 'excel') => {
-    const filename = `extraction-results-${jobData?.job.name}-${Date.now()}.${format}`;
+    const extension = format === 'excel' ? 'xlsx' : format;
+    const filename = `extraction-results-${jobData?.job.name}-${Date.now()}.${extension}`;
 
     if (format === 'json') {
       const dataStr = JSON.stringify(results, null, 2);
