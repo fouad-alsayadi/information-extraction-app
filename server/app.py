@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from server.database import create_tables, init_db_pool, test_db_connection
@@ -123,8 +123,36 @@ async def health():
 # ============================================================================
 # SERVE STATIC FILES FROM CLIENT BUILD DIRECTORY (MUST BE LAST!)
 # ============================================================================
-# This static file mount MUST be the last route registered!
-# It catches all unmatched requests and serves the React app.
-# Any routes added after this will be unreachable!
-if os.path.exists('client/build'):
-  app.mount('/', StaticFiles(directory='client/build', html=True), name='static')
+
+# Add explicit SPA fallback route for deep links
+@app.get('/{full_path:path}')
+async def spa_fallback(full_path: str):
+  """Serve index.html for all non-API routes to support SPA routing."""
+  # Skip if this is an API route
+  if full_path.startswith('api/') or full_path.startswith('health') or full_path.startswith('docs'):
+    # This shouldn't happen as these routes are already defined above
+    return JSONResponse(status_code=404, content={'detail': 'Not Found'})
+
+  # Check if it's a static file request (has file extension)
+  if '.' in full_path.split('/')[-1]:
+    # Try to serve the static file
+    static_file_path = f'client/build/{full_path}'
+    if os.path.exists(static_file_path):
+      return FileResponse(static_file_path)
+    else:
+      return JSONResponse(status_code=404, content={'detail': 'File not found'})
+
+  # For all other routes (SPA deep links), serve index.html
+  index_path = 'client/build/index.html'
+  if os.path.exists(index_path):
+    return FileResponse(index_path)
+  else:
+    return JSONResponse(status_code=404, content={'detail': 'React app not built'})
+
+# Mount static files for serving assets (CSS, JS, images, etc.)
+# This will handle requests like /assets/index-abc123.js
+if os.path.exists('client/build/assets'):
+  app.mount('/assets', StaticFiles(directory='client/build/assets'), name='assets')
+if os.path.exists('client/build/logo'):
+  app.mount('/logo', StaticFiles(directory='client/build/logo'), name='logo')
+# Mount any other static directories as needed
