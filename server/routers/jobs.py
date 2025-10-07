@@ -18,6 +18,7 @@ from server.database import (
   get_all_extraction_jobs,
   get_documents_by_job,
   get_extraction_job,
+  get_extraction_job_with_schema,
   get_extraction_schema,
   get_results_by_job,
   update_extraction_job,
@@ -104,16 +105,55 @@ async def create_job(
 async def get_job(job_id: int):
   """Get job details with documents and results."""
   try:
-    job = get_extraction_job(job_id)
-    if not job:
+    job_with_schema = get_extraction_job_with_schema(job_id)
+    if not job_with_schema:
       raise HTTPException(status_code=404, detail='Job not found')
 
     documents = get_documents_by_job(job_id)
     results = get_results_by_job(job_id)
 
+    # Add databricks_job_id to job data if available
+    job_dict = (
+      job_with_schema.model_dump()
+      if hasattr(job_with_schema, 'model_dump')
+      else dict(job_with_schema)
+    )
+
+    # Add the fixed Databricks job ID from environment variable
+    databricks_job_id = os.getenv('DATABRICKS_JOB_ID')
+    if databricks_job_id:
+      try:
+        job_dict['databricks_job_id'] = int(databricks_job_id)
+      except ValueError:
+        job_dict['databricks_job_id'] = None
+    else:
+      job_dict['databricks_job_id'] = None
+
+    # Add schema field count
+    schema_id = job_dict.get('schema_id')
+    if schema_id:
+      schema = get_extraction_schema(schema_id)
+      job_dict['schema_field_count'] = len(schema.fields) if schema and schema.fields else 0
+    else:
+      job_dict['schema_field_count'] = 0
+
+    # Add the dynamic Databricks run page URL from JobRun if available
+    databricks_run_id = job_dict.get('databricks_run_id')
+    if databricks_run_id:
+      try:
+        databricks_status = await DatabricksService.get_job_status(databricks_run_id)
+        job_dict['run_page_url'] = databricks_status.get('run_page_url')
+      except Exception as e:
+        logger.error(f'Failed to get Databricks run_page_url for run {databricks_run_id}: {str(e)}')
+        job_dict['run_page_url'] = None
+    else:
+      job_dict['run_page_url'] = None
+
     return {
-      'job': job.dict(),
-      'documents': [doc.dict() for doc in documents],
+      'job': job_dict,
+      'documents': [
+        doc.model_dump() if hasattr(doc, 'model_dump') else doc.__dict__ for doc in documents
+      ],
       'results': results,
     }
   except HTTPException:
@@ -258,18 +298,20 @@ async def get_job_status(job_id: int):
     # If job has Databricks run ID, get detailed status from Databricks
     current_stage = None
     progress_percent = None
+    databricks_job_id = None
 
     if job.databricks_run_id:
       try:
         databricks_status = await DatabricksService.get_job_status(job.databricks_run_id)
         current_stage = databricks_status.get('state', {}).get('life_cycle_state', 'unknown')
+        databricks_job_id = databricks_status.get('job_id')
 
         # Map Databricks states to progress percentages
         if current_stage == 'PENDING':
           progress_percent = 10
         elif current_stage == 'RUNNING':
           progress_percent = 50
-        elif current_stage == 'TERMINATED':
+        elif current_stage in ['TERMINATED', 'INTERNAL_ERROR']:
           result_state = databricks_status.get('state', {}).get('result_state')
           if result_state == 'SUCCESS':
             progress_percent = 100
@@ -286,7 +328,10 @@ async def get_job_status(job_id: int):
               update_extraction_job(job_id, {'status': 'failed', 'error_message': error_msg})
 
       except Exception as e:
-        current_stage = f'Status check failed: {str(e)}'
+        logger.error(
+          f'❌ Failed to get Databricks status for run {job.databricks_run_id}: {str(e)}'
+        )
+        current_stage = 'INTERNAL_ERROR'
 
     return JobStatusResponse(
       job_id=job_id,
@@ -295,6 +340,7 @@ async def get_job_status(job_id: int):
       current_stage=current_stage,
       error_message=job.error_message,
       databricks_run_id=job.databricks_run_id,
+      databricks_job_id=databricks_job_id,
     )
 
   except HTTPException:

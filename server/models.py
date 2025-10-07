@@ -212,6 +212,7 @@ class JobStatusResponse(BaseModel):
   current_stage: Optional[str] = None
   error_message: Optional[str] = None
   databricks_run_id: Optional[int] = None
+  databricks_job_id: Optional[int] = None
 
 
 class JobResultsResponse(BaseModel):

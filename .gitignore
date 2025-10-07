@@ -297,7 +297,7 @@ mlartifacts/
 client/src/fastapi_client/
 
 # Frontend build artifacts (auto-generated)
-client/build/
+# Note: client/build/ is kept for Databricks deployment
 client/dist/
 
 # Frontend dependencies and locks
@@ -309,7 +309,7 @@ client/yarn.lock
 # Test artifacts and temporary files
 screenshots/
 tests/playwright/screenshots/
-*.png
+
 *.jpg
 *.jpeg
 test_files/

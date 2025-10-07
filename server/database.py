@@ -531,6 +531,30 @@ def get_extraction_job(job_id: int) -> Optional[ExtractionJob]:
     return_db_connection(conn)
 
 
+def get_extraction_job_with_schema(job_id: int) -> Optional[Dict[str, Any]]:
+  """Get extraction job by ID with schema name included."""
+  conn = get_db_connection()
+  try:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+      cursor.execute(
+        """
+                SELECT j.id, j.name, j.schema_id, j.status, j.created_at, j.updated_at,
+                       j.completed_at, j.error_message, j.databricks_run_id,
+                       s.name as schema_name
+                FROM information_extraction.extraction_jobs j
+                LEFT JOIN information_extraction.extraction_schemas s ON j.schema_id = s.id
+                WHERE j.id = %s
+            """,
+        (job_id,),
+      )
+      row = cursor.fetchone()
+      if row:
+        return dict(row)
+      return None
+  finally:
+    return_db_connection(conn)
+
+
 def get_all_extraction_jobs() -> List[Dict[str, Any]]:
   """Get all extraction jobs with schema names and proper status logic."""
   conn = get_db_connection()

@@ -15,7 +15,15 @@ import { ActivityLogsPage } from './pages/ActivityLogsPage';
 import { JobDetailsPage } from './pages/JobDetailsPage';
 import { SchemaDetailsPage } from './pages/SchemaDetailsPage';
 
-export type Page = 'dashboard' | 'schemas' | 'upload' | 'results' | 'logs' | 'job-details' | 'schema-details';
+export type Page =
+  | 'dashboard'
+  | 'schemas'
+  | 'upload'
+  | 'results'
+  | 'logs'
+  | 'job-details'
+  | 'schema-details'
+  | { type: 'upload'; selectedSchemaId?: number };
 
 // Create a client
 const queryClient = new QueryClient({
@@ -96,13 +104,17 @@ function App() {
   };
 
   const renderPage = () => {
-    switch (currentPage) {
+    // Handle both string and object Page types
+    const pageType = typeof currentPage === 'string' ? currentPage : currentPage.type;
+
+    switch (pageType) {
       case 'dashboard':
         return <DashboardPage onPageChange={handlePageChange} />;
       case 'schemas':
         return <SchemasPage onPageChange={handlePageChange} />;
       case 'upload':
-        return <UploadPage />;
+        const selectedSchemaId = typeof currentPage === 'object' ? currentPage.selectedSchemaId : undefined;
+        return <UploadPage selectedSchemaId={selectedSchemaId} />;
       case 'results':
         return <ResultsPage onPageChange={handlePageChange} />;
       case 'logs':

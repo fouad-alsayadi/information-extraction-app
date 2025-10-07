@@ -14,7 +14,8 @@ import {
   XCircle,
   Clock,
   AlertCircle,
-  Loader2
+  Loader2,
+  Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -263,9 +264,23 @@ export function SchemaDetailsPage({ schemaId, onPageChange }: SchemaDetailsPageP
                 <Play className="h-5 w-5" />
                 Jobs Using This Schema
               </CardTitle>
-              <Badge variant="outline">
-                {jobs.length} job{jobs.length !== 1 ? 's' : ''}
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => {
+                    // Navigate to upload page with pre-selected schema
+                    onPageChange?.({ type: 'upload', selectedSchemaId: schemaId });
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Create New Job
+                </Button>
+                <Badge variant="outline">
+                  {jobs.length} job{jobs.length !== 1 ? 's' : ''}
+                </Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

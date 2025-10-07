@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Loader2, Download, FileText, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, FileText, CheckCircle, XCircle, Clock, AlertCircle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,9 @@ interface JobDetailsData {
     schema_id: number;
     schema_name?: string;
     databricks_run_id?: number;
+    databricks_job_id?: number;
+    schema_field_count?: number;
+    run_page_url?: string;
   };
   documents: Array<{
     id: number;
@@ -31,7 +34,7 @@ interface JobDetailsData {
   results: Array<{
     document_filename: string;
     extracted_data: Record<string, any>;
-    confidence_scores?: Record<string, number>;
+    confidence_scores?: Record<string, number> | null;
   }>;
 }
 
@@ -292,6 +295,44 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
                 <Badge variant={getStatusVariant(jobData.job.status)}>
                   {jobData.job.status}
                 </Badge>
+                {jobData.job.status === 'processing' && jobData.job.databricks_run_id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => {
+                      // Use the dynamic run_page_url from Databricks SDK if available
+                      if (jobData.job.run_page_url) {
+                        window.open(jobData.job.run_page_url, '_blank');
+                      } else {
+                        // Fallback: Try to construct URL manually if run_page_url not available
+                        let databricksHost;
+                        if (window.location.hostname.includes('databricks')) {
+                          // Running in Databricks workspace - extract host from current URL
+                          const parts = window.location.hostname.split('.');
+                          if (parts.length > 2) {
+                            databricksHost = `https://${parts[0]}.cloud.databricks.com`;
+                          } else {
+                            databricksHost = window.location.origin;
+                          }
+                        } else {
+                          // Local development fallback
+                          databricksHost = import.meta.env.VITE_DATABRICKS_HOST;
+                        }
+
+                        if (databricksHost && jobData.job.databricks_job_id && jobData.job.databricks_run_id) {
+                          const url = `${databricksHost}/jobs/${jobData.job.databricks_job_id}/runs/${jobData.job.databricks_run_id}`;
+                          window.open(url, '_blank');
+                        } else {
+                          alert('Unable to open Databricks job page. Job URL not available.');
+                        }
+                      }
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    View in Databricks
+                  </Button>
+                )}
               </div>
               <p className="text-muted-foreground mt-1">
                 Job ID: {jobData.job.id} • Schema: {jobData.job.schema_name || 'Unknown'}
@@ -358,7 +399,7 @@ export function JobDetailsPage({ jobId, onPageChange }: JobDetailsPageProps) {
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Schema Fields:</span>
                   <span className="text-sm text-foreground font-medium">
-                    {jobData.results.length > 0 ? Object.keys(jobData.results[0].extracted_data).length : 'N/A'} fields
+                    {jobData.job.schema_field_count !== undefined ? jobData.job.schema_field_count : 'N/A'} fields
                   </span>
                 </div>
                 {jobData.job.databricks_run_id && (

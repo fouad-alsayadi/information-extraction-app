@@ -9,9 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { SchemasService, JobsService, ExtractionSchemaSummary } from '../fastapi_client';
 
-export function UploadPage() {
+interface UploadPageProps {
+  selectedSchemaId?: number;
+}
+
+export function UploadPage({ selectedSchemaId }: UploadPageProps) {
   const [schemas, setSchemas] = useState<ExtractionSchemaSummary[]>([]);
-  const [selectedSchema, setSelectedSchema] = useState<number | null>(null);
+  const [selectedSchema, setSelectedSchema] = useState<number | null>(selectedSchemaId || null);
   const [jobName, setJobName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,6 +28,13 @@ export function UploadPage() {
   useEffect(() => {
     loadSchemas();
   }, []);
+
+  // Update selected schema when prop changes
+  useEffect(() => {
+    if (selectedSchemaId) {
+      setSelectedSchema(selectedSchemaId);
+    }
+  }, [selectedSchemaId]);
 
   const loadSchemas = async () => {
     try {
