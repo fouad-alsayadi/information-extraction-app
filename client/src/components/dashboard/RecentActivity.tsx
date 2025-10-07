@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect } from "react";
 import { LogsService } from "@/fastapi_client";
+import { formatRelativeTime } from "@/utils/dateUtils";
 
 interface ActivityEntry {
   id: string;
@@ -34,20 +35,6 @@ function getActivityBadge(activityType: string) {
   return variants[activityType as keyof typeof variants] || "bg-gray-100 text-gray-800";
 }
 
-function formatRelativeTime(timestamp: string): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
 
 export function RecentActivity() {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
