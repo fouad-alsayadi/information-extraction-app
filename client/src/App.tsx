@@ -114,7 +114,7 @@ function App() {
         return <SchemasPage onPageChange={handlePageChange} />;
       case 'upload':
         const selectedSchemaId = typeof currentPage === 'object' ? currentPage.selectedSchemaId : undefined;
-        return <UploadPage selectedSchemaId={selectedSchemaId} />;
+        return <UploadPage selectedSchemaId={selectedSchemaId} onPageChange={handlePageChange} />;
       case 'results':
         return <ResultsPage onPageChange={handlePageChange} />;
       case 'logs':

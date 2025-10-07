@@ -8,12 +8,14 @@ import { Upload, FileText, AlertCircle, CheckCircle, Clock, X } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { SchemasService, JobsService, ExtractionSchemaSummary } from '../fastapi_client';
+import { Page } from '../App';
 
 interface UploadPageProps {
   selectedSchemaId?: number;
+  onPageChange?: (page: Page, jobId?: number) => void;
 }
 
-export function UploadPage({ selectedSchemaId }: UploadPageProps) {
+export function UploadPage({ selectedSchemaId, onPageChange }: UploadPageProps) {
   const [schemas, setSchemas] = useState<ExtractionSchemaSummary[]>([]);
   const [selectedSchema, setSelectedSchema] = useState<number | null>(selectedSchemaId || null);
   const [jobName, setJobName] = useState('');
@@ -129,7 +131,7 @@ export function UploadPage({ selectedSchemaId }: UploadPageProps) {
 
       setUploadProgress('Processing documents...');
       setSuccess(
-        `Successfully created job and uploaded ${uploadResult.file_count} files. Processing has started.`
+        `Successfully created job and uploaded ${uploadResult.file_count} files. Processing has started. Redirecting to job details...`
       );
 
       // Reset form
@@ -138,10 +140,12 @@ export function UploadPage({ selectedSchemaId }: UploadPageProps) {
       setFiles([]);
       setUploadProgress(null);
 
-      // You could add polling here to check job status
-      setTimeout(() => {
-        setUploadProgress('Processing in progress...');
-      }, 1000);
+      // Navigate to job details page after successful upload
+      if (onPageChange) {
+        setTimeout(() => {
+          onPageChange('job-details', newJobId);
+        }, 1500); // Small delay to show success message first
+      }
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create job and upload files');
