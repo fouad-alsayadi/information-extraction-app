@@ -23,7 +23,8 @@ export type Page =
   | 'logs'
   | 'job-details'
   | 'schema-details'
-  | { type: 'upload'; selectedSchemaId?: number };
+  | { type: 'upload'; selectedSchemaId?: number }
+  | { type: 'schemas'; duplicateSchemaId?: number };
 
 // Create a client
 const queryClient = new QueryClient({
@@ -111,9 +112,10 @@ function App() {
       case 'dashboard':
         return <DashboardPage onPageChange={handlePageChange} />;
       case 'schemas':
-        return <SchemasPage onPageChange={handlePageChange} />;
+        const duplicateSchemaId = typeof currentPage === 'object' && 'duplicateSchemaId' in currentPage ? currentPage.duplicateSchemaId : undefined;
+        return <SchemasPage onPageChange={handlePageChange} duplicateSchemaId={duplicateSchemaId} />;
       case 'upload':
-        const selectedSchemaId = typeof currentPage === 'object' ? currentPage.selectedSchemaId : undefined;
+        const selectedSchemaId = typeof currentPage === 'object' && 'selectedSchemaId' in currentPage ? currentPage.selectedSchemaId : undefined;
         return <UploadPage selectedSchemaId={selectedSchemaId} onPageChange={handlePageChange} />;
       case 'results':
         return <ResultsPage onPageChange={handlePageChange} />;

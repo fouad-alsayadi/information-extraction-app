@@ -15,7 +15,8 @@ import {
   Clock,
   AlertCircle,
   Loader2,
-  Plus
+  Plus,
+  Copy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -155,6 +156,17 @@ export function SchemaDetailsPage({ schemaId, onPageChange }: SchemaDetailsPageP
               {schema.description || 'No description provided'}
             </p>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              // Navigate to schemas page with duplicate intent
+              onPageChange({ type: 'schemas', duplicateSchemaId: schemaId });
+            }}
+            className="gap-2"
+          >
+            <Copy className="h-4 w-4" />
+            Duplicate Schema
+          </Button>
         </div>
 
         {/* Schema Information Section */}

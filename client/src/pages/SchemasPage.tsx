@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, FileText, Calendar, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, Calendar, Loader2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,18 +12,27 @@ import { SchemasService, ExtractionSchemaSummary, SchemaField } from '../fastapi
 
 interface SchemasPageProps {
   onPageChange?: (page: 'schemas' | 'upload' | 'results' | 'dashboard' | 'job-details' | 'schema-details', jobId?: number, schemaId?: number) => void;
+  duplicateSchemaId?: number;
 }
 
-export function SchemasPage({ onPageChange }: SchemasPageProps = {}) {
+export function SchemasPage({ onPageChange, duplicateSchemaId }: SchemasPageProps = {}) {
   const [schemas, setSchemas] = useState<ExtractionSchemaSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [duplicateSchemaData, setDuplicateSchemaData] = useState<ExtractionSchemaSummary | null>(null);
 
   // Load schemas on mount
   useEffect(() => {
     loadSchemas();
   }, []);
+
+  // Handle automatic duplication when duplicateSchemaId is provided
+  useEffect(() => {
+    if (duplicateSchemaId) {
+      handleDuplicateSchema(duplicateSchemaId);
+    }
+  }, [duplicateSchemaId]);
 
   const loadSchemas = async () => {
     try {
@@ -60,6 +69,17 @@ export function SchemasPage({ onPageChange }: SchemasPageProps = {}) {
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to delete schema');
       }
+    }
+  };
+
+  const handleDuplicateSchema = async (schemaId: number) => {
+    try {
+      // Fetch the full schema details
+      const schemaDetails = await SchemasService.getSchemaApiSchemasSchemaIdGet(schemaId);
+      setDuplicateSchemaData(schemaDetails);
+      setShowCreateModal(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load schema for duplication');
     }
   };
 
@@ -160,6 +180,18 @@ export function SchemasPage({ onPageChange }: SchemasPageProps = {}) {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
+                          handleDuplicateSchema(schema.id);
+                        }}
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Duplicate schema"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleDeleteSchema(schema.id, schema.name);
                         }}
                         className="text-muted-foreground hover:text-destructive"
@@ -199,8 +231,12 @@ export function SchemasPage({ onPageChange }: SchemasPageProps = {}) {
         {/* Create Schema Modal */}
         {showCreateModal && (
           <CreateSchemaModal
-            onClose={() => setShowCreateModal(false)}
+            onClose={() => {
+              setShowCreateModal(false);
+              setDuplicateSchemaData(null);
+            }}
             onCreate={handleCreateSchema}
+            duplicateData={duplicateSchemaData}
           />
         )}
       </div>
@@ -212,14 +248,17 @@ export function SchemasPage({ onPageChange }: SchemasPageProps = {}) {
 interface CreateSchemaModalProps {
   onClose: () => void;
   onCreate: (data: { name: string; description: string; fields: SchemaField[] }) => void;
+  duplicateData?: ExtractionSchemaSummary | null;
 }
 
-function CreateSchemaModal({ onClose, onCreate }: CreateSchemaModalProps) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [fields, setFields] = useState<SchemaField[]>([
-    { name: '', type: 'text', required: false, description: '' },
-  ]);
+function CreateSchemaModal({ onClose, onCreate, duplicateData }: CreateSchemaModalProps) {
+  const [name, setName] = useState(duplicateData ? `${duplicateData.name} (Copy)` : '');
+  const [description, setDescription] = useState(duplicateData?.description || '');
+  const [fields, setFields] = useState<SchemaField[]>(
+    duplicateData?.fields?.length ? duplicateData.fields : [
+      { name: '', type: 'text', required: false, description: '' },
+    ]
+  );
 
   const addField = () => {
     setFields([...fields, { name: '', type: 'text', required: false, description: '' }]);
@@ -259,7 +298,9 @@ function CreateSchemaModal({ onClose, onCreate }: CreateSchemaModalProps) {
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
         <div className="mt-3">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Create New Schema</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            {duplicateData ? 'Duplicate Schema' : 'Create New Schema'}
+          </h3>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Basic Info */}
@@ -379,7 +420,7 @@ function CreateSchemaModal({ onClose, onCreate }: CreateSchemaModalProps) {
                 type="submit"
                 className="bg-gradient-primary text-primary-foreground hover:opacity-90"
               >
-                Create Schema
+                {duplicateData ? 'Duplicate Schema' : 'Create Schema'}
               </Button>
             </div>
           </form>
