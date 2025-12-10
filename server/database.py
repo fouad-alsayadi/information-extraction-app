@@ -786,9 +786,24 @@ def get_results_by_job(job_id: int) -> List[Dict[str, Any]]:
       results = []
       for row in cursor.fetchall():
         result_dict = dict(row)
-        result_dict['extracted_data'] = json.loads(result_dict['extracted_data'])
+        # Handle NULL or empty extracted_data
+        if result_dict['extracted_data']:
+          try:
+            result_dict['extracted_data'] = json.loads(result_dict['extracted_data'])
+          except (json.JSONDecodeError, ValueError):
+            result_dict['extracted_data'] = {}
+        else:
+          result_dict['extracted_data'] = {}
+
+        # Handle NULL or empty confidence_scores
         if result_dict['confidence_scores']:
-          result_dict['confidence_scores'] = json.loads(result_dict['confidence_scores'])
+          try:
+            result_dict['confidence_scores'] = json.loads(result_dict['confidence_scores'])
+          except (json.JSONDecodeError, ValueError):
+            result_dict['confidence_scores'] = {}
+        else:
+          result_dict['confidence_scores'] = {}
+
         results.append(result_dict)
       return results
   finally:

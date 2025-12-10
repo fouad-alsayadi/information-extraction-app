@@ -362,6 +362,25 @@ async def get_job_results(job_id: int):
 
     results = get_results_by_job(job_id)
 
+    # Normalize results to ensure extracted_data is a dictionary
+    normalized_results = []
+    for result in results:
+      extracted_data = result['extracted_data']
+
+      # If extracted_data is not a dictionary, mark it as an error
+      if not isinstance(extracted_data, dict):
+        extracted_data = {
+          '_error': 'Invalid data format',
+          '_error_details': f'Expected dictionary but got {type(extracted_data).__name__}',
+          '_raw_data': str(extracted_data)[:500] if extracted_data else None  # Limit size
+        }
+
+      normalized_results.append({
+        'document_filename': result['document_filename'],
+        'extracted_data': extracted_data,
+        'confidence_scores': result['confidence_scores'],
+      })
+
     return JobResultsResponse(
       job_id=job_id,
       job_name=job.name,
@@ -369,14 +388,7 @@ async def get_job_results(job_id: int):
       status=job.status,
       created_at=job.created_at,
       completed_at=job.completed_at,
-      results=[
-        {
-          'document_filename': result['document_filename'],
-          'extracted_data': result['extracted_data'],
-          'confidence_scores': result['confidence_scores'],
-        }
-        for result in results
-      ],
+      results=normalized_results,
     )
 
   except HTTPException:

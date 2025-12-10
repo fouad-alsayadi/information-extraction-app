@@ -4,7 +4,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -87,19 +87,35 @@ app.add_middleware(
 )
 
 
-# Global exception handler to log full tracebacks
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-  """Log full traceback for all unhandled exceptions."""
+# Middleware to catch and log all exceptions with proper traceback context
+@app.middleware('http')
+async def exception_logging_middleware(request: Request, call_next):
+  """Catch all exceptions and log them with full tracebacks before re-raising."""
   import traceback
 
-  logger = logging.getLogger(__name__)
-  logger.error(f'Unhandled exception on {request.method} {request.url}')
-  logger.error(f'Exception: {str(exc)}')
-  logger.error(f'Full traceback:\n{traceback.format_exc()}')
+  exception_logger = logging.getLogger(__name__)
 
-  # Return generic 500 error to client
-  return JSONResponse(status_code=500, content={'detail': 'Internal server error'})
+  try:
+    return await call_next(request)
+  except Exception as exc:
+    # Log the exception with full traceback context
+    exc_type = type(exc).__name__
+    exc_detail = str(exc)
+
+    # Determine status code
+    if isinstance(exc, HTTPException):
+      status_code = exc.status_code
+      if status_code >= 500:
+        exception_logger.error(f'HTTP {status_code} on {request.method} {request.url}')
+        exception_logger.error(f'Detail: {exc.detail}')
+        exception_logger.error(f'Full traceback:\n{traceback.format_exc()}')
+    else:
+      exception_logger.error(f'Unhandled {exc_type} on {request.method} {request.url}')
+      exception_logger.error(f'Exception: {exc_detail}')
+      exception_logger.error(f'Full traceback:\n{traceback.format_exc()}')
+
+    # Re-raise to let FastAPI's exception handlers format the response
+    raise
 
 
 app.include_router(router, prefix='/api', tags=['api'])

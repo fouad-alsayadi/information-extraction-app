@@ -1,0 +1,18 @@
+resources:
+  jobs:
+    information_extraction_job:
+      name: information-extraction-job
+      tasks:
+        - task_key: information-extraction-job
+          notebook_task:
+            notebook_path: /Workspace/Users/fouad.alsayadi@databricks.com/databricks-apps-resources/portfolio-manager/information-extraction-main
+            base_parameters:
+              schema_id: "1"
+              job_id: "13"
+            source: WORKSPACE
+          max_retries: 1
+          min_retry_interval_millis: 900000
+          disable_auto_optimization: false
+      queue:
+        enabled: true
+      performance_target: PERFORMANCE_OPTIMIZED
