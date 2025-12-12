@@ -1,7 +1,7 @@
 # lakebase conf
 db_password_scope: fouad_demos
 lakebase_db_password_key: lakebase_db_password
-lakebase_instance_host: "instance-541fd9c0-e9ad-415a-aae8-4bd94008b206.database.azuredatabricks.net"
+lakebase_instance_host: "instance-14a1000d-f0b9-4892-b7b8-8a4c4def5d31.database.azuredatabricks.net"
 lakebase_db_name: information_extractor
 lakebase_schema_name: information_extraction
 ai_parse_document_output_table: "fouad_demos.information_extraction.ai_parse_document_output"

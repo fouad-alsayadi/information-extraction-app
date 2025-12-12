@@ -2,7 +2,6 @@
 
 import json
 import logging
-import os
 import traceback
 from typing import Any, Dict, List, Optional
 
@@ -31,13 +30,16 @@ _connection_pool: Optional[SimpleConnectionPool] = None
 
 
 def get_db_config() -> Dict[str, str]:
-  """Get database configuration from environment variables."""
+  """Get database configuration from centralized config system."""
+  from server.config import get_config
+
+  config = get_config()
   return {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': os.getenv('DB_PORT', '5432'),
-    'database': os.getenv('DB_NAME', 'information_extraction'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', ''),
+    'host': config.database.host,
+    'port': str(config.database.port),
+    'database': config.database.name,
+    'user': config.database.user,
+    'password': config.database.password,
   }
 
 
@@ -148,10 +150,6 @@ def create_tables() -> None:
 
       # === TABLE CREATION FIRST ===
 
-
-
-
-
       # Create documents table
       cursor.execute("""
                 CREATE TABLE IF NOT EXISTS information_extraction.documents (
@@ -195,7 +193,6 @@ def create_tables() -> None:
                     FOREIGN KEY (analysis_id) REFERENCES information_extraction.extraction_jobs (id)
                 )
             """)
-
 
       # Create indexes for better performance
       cursor.execute(
@@ -604,7 +601,8 @@ def get_extraction_jobs_by_schema(schema_id: int) -> List[Dict[str, Any]]:
   conn = get_db_connection()
   try:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-      cursor.execute("""
+      cursor.execute(
+        """
                 SELECT
                     j.id,
                     j.name,
@@ -629,7 +627,9 @@ def get_extraction_jobs_by_schema(schema_id: int) -> List[Dict[str, Any]]:
                 ) doc_count ON j.id = doc_count.job_id
                 WHERE j.schema_id = %s
                 ORDER BY j.created_at DESC
-            """, (schema_id,))
+            """,
+        (schema_id,),
+      )
 
       # Convert to list and update status to computed_status
       jobs = []

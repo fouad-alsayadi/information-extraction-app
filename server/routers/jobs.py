@@ -6,11 +6,10 @@ import traceback
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from databricks.sdk import WorkspaceClient
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-logger = logging.getLogger(__name__)
-from databricks.sdk import WorkspaceClient
-
+from server.config import get_config
 from server.database import (
   create_document,
   create_extraction_job,
@@ -34,14 +33,14 @@ from server.models import (
 )
 from server.services.databricks_service import DatabricksService
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# File upload configuration for UC Volumes
-UPLOAD_BASE_PATH = os.getenv(
-  'UPLOAD_BASE_PATH', '/Volumes/fouad_demos/portfolio_analysis/information_extraction_uploads/'
-)
-ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.doc', '.png', '.jpg', '.jpeg', '.txt'}
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+# File upload configuration - loaded from centralized config (no fallbacks)
+_config = get_config()
+UPLOAD_BASE_PATH = _config.upload.base_path  # No fallback - will fail if not configured
+ALLOWED_EXTENSIONS = set(_config.upload.allowed_extensions)
+MAX_FILE_SIZE = _config.upload.max_size_mb * 1024 * 1024
 
 
 def get_workspace_client() -> WorkspaceClient:
@@ -197,10 +196,7 @@ async def upload_files(
       if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
           status_code=400,
-          detail=(
-            f'File type {file_ext} not supported. '
-            f'Allowed: {", ".join(ALLOWED_EXTENSIONS)}'
-          ),
+          detail=(f'File type {file_ext} not supported. Allowed: {", ".join(ALLOWED_EXTENSIONS)}'),
         )
 
       # Read and validate file size
@@ -209,8 +205,7 @@ async def upload_files(
         raise HTTPException(
           status_code=400,
           detail=(
-            f'File {file.filename} is too large. '
-            f'Maximum size: {MAX_FILE_SIZE // 1024 // 1024}MB'
+            f'File {file.filename} is too large. Maximum size: {MAX_FILE_SIZE // 1024 // 1024}MB'
           ),
         )
 
@@ -237,9 +232,7 @@ async def upload_files(
       total_size += len(content)
 
     # Update job status and upload directory
-    update_extraction_job(
-      job_id, {'status': 'uploaded', 'upload_directory': job_upload_path}
-    )
+    update_extraction_job(job_id, {'status': 'uploaded', 'upload_directory': job_upload_path})
 
     # Create upload log entry (required by notebook)
     user_id = get_user_for_logging(user_context)
@@ -259,9 +252,7 @@ async def upload_files(
       run_id = await DatabricksService.trigger_extraction_job(job_id, job.schema_id)
 
       # Update job with Databricks run ID and processing status
-      update_extraction_job(
-        job_id, {'status': 'processing', 'databricks_run_id': run_id}
-      )
+      update_extraction_job(job_id, {'status': 'processing', 'databricks_run_id': run_id})
 
     except Exception as e:
       # Update job status to indicate processing trigger failed
@@ -372,14 +363,16 @@ async def get_job_results(job_id: int):
         extracted_data = {
           '_error': 'Invalid data format',
           '_error_details': f'Expected dictionary but got {type(extracted_data).__name__}',
-          '_raw_data': str(extracted_data)[:500] if extracted_data else None  # Limit size
+          '_raw_data': str(extracted_data)[:500] if extracted_data else None,  # Limit size
         }
 
-      normalized_results.append({
-        'document_filename': result['document_filename'],
-        'extracted_data': extracted_data,
-        'confidence_scores': result['confidence_scores'],
-      })
+      normalized_results.append(
+        {
+          'document_filename': result['document_filename'],
+          'extracted_data': extracted_data,
+          'confidence_scores': result['confidence_scores'],
+        }
+      )
 
     return JobResultsResponse(
       job_id=job_id,

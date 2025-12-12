@@ -6,27 +6,39 @@ env:
   # Application Environment
   - name: 'PORT'
     value: '8080'
-  
+
+  # ============================================================================
   # Database Configuration (Azure Databricks PostgreSQL)
+  # Source: config/base.yaml (database section)
+  # These values MUST match config/base.yaml - run scripts/validate_config.py
+  # ============================================================================
   - name: 'DB_HOST'
     value: 'instance-14a1000d-f0b9-4892-b7b8-8a4c4def5d31.database.azuredatabricks.net'
-  
+
   - name: 'DB_PORT'
     value: '5432'
-  
+
   - name: 'DB_NAME'
     value: 'information_extractor'
-  
+
   - name: 'DB_USER'
     value: 'sanabil_app'
-  
-  # Database Password (using valueFrom for secrets)
+
+  # Database Password (from Databricks Secrets)
+  # Scope and key defined in config/base.yaml (secrets.database_password)
   - name: 'DB_PASSWORD'
     valueFrom: lakebase_db_password
 
+  # ============================================================================
   # File Upload Configuration
+  # Source: config/base.yaml (upload section)
+  # ============================================================================
   - name: 'UPLOAD_BASE_PATH'
     valueFrom: documents_upload_volume
 
+  # ============================================================================
+  # Databricks Job Configuration
+  # Source: config/base.yaml (databricks section)
+  # ============================================================================
   - name: DATABRICKS_JOB_ID
     valueFrom: information_extraction_job

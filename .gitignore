@@ -314,3 +314,6 @@ tests/playwright/screenshots/
 *.jpeg
 test_files/
 temp_files/
+
+# Centralized configuration secrets (contains plaintext passwords for local dev)
+config/secrets.yaml

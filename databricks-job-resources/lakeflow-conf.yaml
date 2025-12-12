@@ -2,6 +2,7 @@ resources:
   jobs:
     information_extraction_job:
       name: information-extraction-job
+      max_concurrent_runs: 10
       tasks:
         - task_key: information-extraction-job
           notebook_task:
@@ -13,6 +14,14 @@ resources:
           max_retries: 1
           min_retry_interval_millis: 900000
           disable_auto_optimization: false
+          environment_key: information-extraction-job-environment
       queue:
         enabled: true
+      environments:
+        - environment_key: information-extraction-job-environment
+          spec:
+            dependencies:
+              - SQLAlchemy==2.0.36
+              - psycopg[binary]==3.2.4
+            environment_version: "4"
       performance_target: PERFORMANCE_OPTIMIZED

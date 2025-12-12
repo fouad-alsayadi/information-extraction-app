@@ -87,5 +87,3 @@ async def get_dashboard_stats() -> Dict[str, Any]:
   finally:
     if 'conn' in locals():
       return_db_connection(conn)
-
-

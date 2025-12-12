@@ -1,0 +1,13 @@
+# Local Development Overrides
+# This file is committed to git and provides local development-specific settings
+# Values here override those in base.yaml
+
+# Override for local development (if needed)
+database:
+  # All values inherited from base.yaml
+  # Uncomment to override for local PostgreSQL testing:
+  # host: "localhost"
+  # port: 5432
+  # name: "information_extraction_local"
+
+# Local secrets will be loaded from secrets.yaml (git-ignored)

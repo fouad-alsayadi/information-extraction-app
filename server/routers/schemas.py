@@ -13,8 +13,8 @@ from server.database import (
   create_extraction_schema,
   delete_extraction_schema,
   get_all_extraction_schemas,
-  get_extraction_schema,
   get_extraction_jobs_by_schema,
+  get_extraction_schema,
   update_extraction_schema,
 )
 from server.dependencies.auth import get_current_user_context, get_user_for_logging

@@ -4,9 +4,9 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from server.database import create_tables, init_db_pool, test_db_connection
@@ -49,20 +49,39 @@ uvicorn_logger.setLevel(logging.DEBUG)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
   """Manage application lifespan."""
-  # Startup: Initialize database
+  logger = logging.getLogger(__name__)
+
+  # Startup: Load and validate configuration
+  try:
+    from server.config import get_config
+
+    config = get_config()
+    logger.info('✅ Configuration loaded successfully')
+    logger.info(f'   Environment: {config.environment}')
+    logger.info(f'   Database: {config.database.host}/{config.database.name}')
+    logger.info(f'   Upload path: {config.upload.base_path}')
+    logger.info(f'   Databricks Job ID: {config.databricks.job_id}')
+  except Exception as e:
+    logger.error(f'❌ Configuration validation failed: {e}')
+    logger.error('   Application startup aborted due to configuration errors')
+    raise
+
+  # Initialize database
   try:
     init_db_pool()
     create_tables()
     if not test_db_connection():
-      print('Warning: Database connection test failed')
+      logger.warning('⚠️  Database connection test failed')
     else:
-      print('Database connection successful')
+      logger.info('✅ Database connection successful')
   except Exception as e:
-    print(f'Database initialization failed: {e}')
+    logger.error(f'❌ Database initialization failed: {e}')
+    raise
 
   yield
 
   # Shutdown: Clean up resources
+  logger.info('🛑 Application shutdown initiated')
   # Add any cleanup code here if needed
 
 
@@ -192,6 +211,7 @@ async def health():
 # SERVE STATIC FILES FROM CLIENT BUILD DIRECTORY (MUST BE LAST!)
 # ============================================================================
 
+
 # Add explicit SPA fallback route for deep links
 @app.get('/{full_path:path}')
 async def spa_fallback(full_path: str):
@@ -216,6 +236,7 @@ async def spa_fallback(full_path: str):
     return FileResponse(index_path)
   else:
     return JSONResponse(status_code=404, content={'detail': 'React app not built'})
+
 
 # Mount static files for serving assets (CSS, JS, images, etc.)
 # This will handle requests like /assets/index-abc123.js

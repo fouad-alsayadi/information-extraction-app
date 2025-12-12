@@ -1,9 +1,10 @@
 """Databricks integration service for document processing."""
 
-import os
 from typing import Any, Dict
 
 from databricks.sdk import WorkspaceClient
+
+from server.config import get_config
 
 
 class DatabricksService:
@@ -17,14 +18,8 @@ class DatabricksService:
 
   @staticmethod
   def _get_job_id() -> int:
-    """Get the Databricks job ID from environment variables."""
-    job_id = os.getenv('DATABRICKS_JOB_ID')
-    if not job_id:
-      raise ValueError('DATABRICKS_JOB_ID environment variable not set')
-    try:
-      return int(job_id)
-    except ValueError:
-      raise ValueError(f'DATABRICKS_JOB_ID must be a valid integer, got: {job_id}')
+    """Get the Databricks job ID from centralized config."""
+    return get_config().databricks.job_id
 
   @staticmethod
   async def trigger_extraction_job(job_id: int, schema_id: int) -> int:
