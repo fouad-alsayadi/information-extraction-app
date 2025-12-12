@@ -87,6 +87,58 @@ app.add_middleware(
 )
 
 
+# Global exception handler for HTTPException to log 500-level errors
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+  """Log HTTPException errors (especially 500-level) with context."""
+  import traceback
+
+  exception_logger = logging.getLogger(__name__)
+
+  # Log 500-level errors with full details
+  if exc.status_code >= 500:
+    exception_logger.error('=' * 80)
+    exception_logger.error(f'HTTP {exc.status_code} ERROR: {request.method} {request.url.path}')
+    exception_logger.error(f'Detail: {exc.detail}')
+    exception_logger.error('Traceback:')
+    exception_logger.error(traceback.format_exc())
+    exception_logger.error('=' * 80)
+
+  # Return the default HTTPException response
+  return JSONResponse(
+    status_code=exc.status_code, content={'detail': exc.detail, 'path': str(request.url.path)}
+  )
+
+
+# Global exception handler to log all unhandled exceptions
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+  """Catch all unhandled exceptions and log with full traceback."""
+  import traceback
+
+  exception_logger = logging.getLogger(__name__)
+
+  # Log the full exception details
+  exception_logger.error('=' * 80)
+  exception_logger.error(f'UNHANDLED EXCEPTION: {request.method} {request.url.path}')
+  exception_logger.error(f'Exception Type: {type(exc).__name__}')
+  exception_logger.error(f'Exception Message: {str(exc)}')
+  exception_logger.error('Full Traceback:')
+  exception_logger.error(traceback.format_exc())
+  exception_logger.error('=' * 80)
+
+  # Return a proper error response
+  return JSONResponse(
+    status_code=500,
+    content={
+      'detail': 'Internal Server Error',
+      'error': str(exc),
+      'type': type(exc).__name__,
+      'path': str(request.url.path),
+    },
+  )
+
+
 # Middleware to catch and log all exceptions with proper traceback context
 @app.middleware('http')
 async def exception_logging_middleware(request: Request, call_next):
