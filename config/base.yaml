@@ -1,35 +1,31 @@
-# Base Configuration for Information Extraction App
-# This is the single source of truth for all configuration values
-# Values here are shared across backend, frontend, and Databricks jobs
-
-# Database Configuration (PostgreSQL on Databricks)
 database:
-  host: "instance-14a1000d-f0b9-4892-b7b8-8a4c4def5d31.database.azuredatabricks.net"
+  host: instance-6308e8f8-a992-4de7-a85c-7beb1fdc8d8a.database.cloud.databricks.com
   port: 5432
-  name: "information_extractor"
-  user: "sanabil_app"
-  schema: "information_extraction"
-  # Password loaded from secrets (see secrets.yaml for local dev, or Databricks secrets for prod)
-
-# Databricks Configuration
+  name: information_extractor
+  user: sanabil_app
+  schema: information_extraction
 databricks:
-  job_id: 820399633256747
-  output_table: "fouad_demos.information_extraction.ai_parse_document_output"
-
-# File Upload Configuration
+  job_id: 424554646032710
+  output_table: fouad_demos.information_extraction.ai_parse_document_output
 upload:
-  base_path: "/Volumes/fouad_demos/information_extraction/sanabil_documents"
+  base_path: /Volumes/fouad_demos/information_extraction/sanabil_documents
   max_size_mb: 50
-  allowed_extensions: [".pdf", ".docx", ".doc", ".png", ".jpg", ".jpeg", ".txt"]
-
-# Secrets Configuration (references only - actual values loaded from environment)
+  allowed_extensions:
+  - .pdf
+  - .docx
+  - .doc
+  - .png
+  - .jpg
+  - .jpeg
+  - .txt
 secrets:
   database_password:
-    scope: "fouad_demos"
-    key: "lakebase_db_password"
-  upload_volume:
-    scope: "databricks_app_config"
-    key: "documents_upload_volume"
-  job_id:
-    scope: "databricks_app_config"
-    key: "information_extraction_job"
+    scope: information_extraction
+    key: lakebase_db_password
+job:
+  db_password_scope: information_extraction
+  lakebase_db_password_key: lakebase_db_password
+  lakebase_instance_host: instance-6308e8f8-a992-4de7-a85c-7beb1fdc8d8a.database.cloud.databricks.com
+  lakebase_db_name: information_extractor
+  lakebase_schema_name: information_extraction
+  ai_parse_document_output_table: fouad_demos.information_extraction.ai_parse_document_output

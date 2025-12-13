@@ -8,6 +8,7 @@ TEMP_FILE=""
 if [ "$1" = "--auto-close" ]; then
     AUTO_CLOSE=true
     TEMP_FILE="$2"
+    shift 2
 fi
 
 # Function to signal completion on exit
@@ -22,11 +23,65 @@ if [ "$AUTO_CLOSE" = true ]; then
     trap cleanup EXIT
 fi
 
-echo "🚀 Databricks App Template Setup"
-echo "================================="
-
 # Get the directory of this script
 SETUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Enhanced Setup Wizard - Python-based interactive setup
+echo "🚀 Starting Enhanced Setup Wizard..."
+echo ""
+
+# Check if uv is available (minimal check before running wizard)
+if ! command -v uv >/dev/null 2>&1; then
+    echo "❌ uv is not installed. The setup wizard requires uv."
+    echo "Please install uv first:"
+    echo "  macOS/Linux: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    echo "  Or visit: https://docs.astral.sh/uv/"
+    exit 1
+fi
+
+# Run the enhanced setup wizard
+uv run python scripts/setup_wizard.py "$@"
+WIZARD_EXIT_CODE=$?
+
+# If wizard failed, exit with its code
+if [ $WIZARD_EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ Setup wizard failed with exit code $WIZARD_EXIT_CODE"
+    echo "Please address the errors above and run ./setup.sh again"
+    exit $WIZARD_EXIT_CODE
+fi
+
+echo ""
+echo "🎉 Setup complete!"
+echo ""
+
+# Auto-close terminal if flag is set
+if [ "$AUTO_CLOSE" = true ]; then
+    echo ""
+    echo "Press Enter to close this terminal..."
+    read
+
+    # Only attempt to close on macOS where osascript is available
+    if command -v osascript >/dev/null 2>&1; then
+        # Close appropriate terminal app
+        if [ -d "/Applications/iTerm.app" ]; then
+            # For iTerm, close the current window
+            osascript -e 'tell application "iTerm" to close current window' 2>/dev/null || true
+        elif [ -d "/Applications/Terminal.app" ]; then
+            # For Terminal, close windows containing setup.sh
+            osascript -e 'tell application "Terminal" to close (every window whose name contains "setup.sh")' 2>/dev/null || true
+        fi
+    fi
+fi
+
+# Legacy setup code below (kept for reference, not executed)
+# ============================================================
+# The wizard above handles all the setup logic.
+# The code below is preserved for reference only.
+exit 0
+
+# Original setup code starts here (unreachable)
+# ===========================================
 
 # Source shared utilities
 source "$SETUP_DIR/setup_utils/utils.sh"

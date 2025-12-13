@@ -317,3 +317,6 @@ temp_files/
 
 # Centralized configuration secrets (contains plaintext passwords for local dev)
 config/secrets.yaml
+
+# Setup wizard state file (contains setup progress and resource IDs)
+.setup-state.json

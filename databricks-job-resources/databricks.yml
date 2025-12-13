@@ -1,0 +1,9 @@
+bundle:
+  name: information-extraction-job-bundle
+
+include:
+  - lakeflow-conf.yaml
+
+targets:
+  default:
+    mode: development
