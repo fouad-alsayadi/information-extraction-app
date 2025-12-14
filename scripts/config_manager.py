@@ -78,106 +78,95 @@ def _deep_merge(base: dict, overlay: dict) -> None:
       base[key] = value
 
 
-def create_secrets_yaml(db_password: str, upload_base_path: str = None) -> bool:
-  """Create config/secrets.yaml from template.
+def update_env_local(db_password: str) -> bool:
+  """Update .env.local with database password.
 
   Args:
       db_password: Database password
-      upload_base_path: Optional upload base path override
 
   Returns:
-      True if creation successful, False otherwise
+      True if update successful, False otherwise
   """
   try:
-    secrets_path = Path('config/secrets.yaml')
+    env_local_path = Path('.env.local')
 
-    if secrets_path.exists():
-      console.print('[yellow]⚠️  config/secrets.yaml already exists, skipping[/yellow]')
-      return True
+    # Read existing .env.local if it exists
+    existing_lines = []
+    db_password_found = False
 
-    # Create secrets dict
-    secrets = {'database': {'password': db_password}}
+    if env_local_path.exists():
+      with open(env_local_path) as f:
+        for line in f:
+          # Skip existing DB_PASSWORD line
+          if line.strip().startswith('DB_PASSWORD='):
+            db_password_found = True
+            continue
+          existing_lines.append(line.rstrip('\n'))
 
-    if upload_base_path:
-      secrets['upload'] = {'base_path': upload_base_path}
+    # Add DB_PASSWORD at the end if not already there
+    if not db_password_found:
+      # Add empty line before secrets section if needed
+      if existing_lines and existing_lines[-1] != '':
+        existing_lines.append('')
+      # Add comment if not present
+      if '# Local development secrets' not in '\n'.join(existing_lines):
+        existing_lines.append('# Local development secrets')
 
-    # Write secrets file
-    with open(secrets_path, 'w') as f:
-      yaml.safe_dump(secrets, f, default_flow_style=False)
+    # Always add the DB_PASSWORD line (either replacing or adding new)
+    existing_lines.append(f'DB_PASSWORD={db_password}')
 
-    console.print(f'[green]✅ Created {secrets_path}[/green]')
+    # Write back to .env.local
+    with open(env_local_path, 'w') as f:
+      f.write('\n'.join(existing_lines))
+      if existing_lines:  # Add final newline if there's content
+        f.write('\n')
+
+    console.print(f'[green]✅ Updated {env_local_path} with DB_PASSWORD[/green]')
     return True
 
   except Exception as e:
-    console.print(f'[red]❌ Error creating secrets file: {e}[/red]')
+    console.print(f'[red]❌ Error updating .env.local: {e}[/red]')
     return False
 
 
-def update_app_yaml_from_base() -> bool:
-  """Sync app.yaml environment variables from base.yaml.
+def update_app_yaml_with_resources() -> bool:
+  """Update app.yaml with app resource references.
 
-  Reads config/base.yaml and updates app.yaml environment variables to match,
-  preserving other app.yaml settings.
+  All configuration comes from base.yaml. app.yaml only contains references
+  to app resources (secrets, volumes, jobs) via valueFrom.
 
   Returns:
-      True if sync successful, False otherwise
+      True if update successful, False otherwise
   """
   try:
-    base_path = Path('config/base.yaml')
     app_path = Path('app.yaml')
-
-    if not base_path.exists():
-      console.print(f'[red]❌ {base_path} not found[/red]')
-      return False
 
     if not app_path.exists():
       console.print(f'[red]❌ {app_path} not found[/red]')
       return False
 
-    # Load both files
-    with open(base_path) as f:
-      base = yaml.safe_load(f) or {}
-
+    # Load app.yaml
     with open(app_path) as f:
       app = yaml.safe_load(f) or {}
 
-    # Update app.yaml env vars to match base.yaml
-    env_vars = app.get('env', [])
-    env_map = {item['name']: item for item in env_vars if 'name' in item}
-
-    # Update database settings
-    if 'database' in base:
-      db = base['database']
-      env_map.setdefault('DB_HOST', {})['value'] = db.get('host', '')
-      env_map.setdefault('DB_PORT', {})['value'] = str(db.get('port', 5432))
-      env_map.setdefault('DB_NAME', {})['value'] = db.get('name', '')
-      env_map.setdefault('DB_USER', {})['value'] = db.get('user', '')
-
-    # Update job ID
-    if 'databricks' in base and 'job_id' in base['databricks']:
-      env_map.setdefault('DATABRICKS_JOB_ID', {})['value'] = str(base['databricks']['job_id'])
-
-    # Update upload base path
-    if 'upload' in base and 'base_path' in base['upload']:
-      env_map.setdefault('UPLOAD_BASE_PATH', {})['value'] = base['upload']['base_path']
-
-    # Rebuild env list with updated values
-    updated_env = []
-    for name, item in env_map.items():
-      item['name'] = name
-      updated_env.append(item)
-
-    app['env'] = updated_env
+    # Update app.yaml with only resource references (no direct values)
+    # These reference app resources defined when creating the Databricks App
+    app['env'] = [
+      {'name': 'APP_ENV', 'value': 'app'},
+      {'name': 'DB_PASSWORD', 'valueFrom': 'lakebase_db_password'},
+      {'name': 'UPLOAD_BASE_PATH', 'valueFrom': 'documents_upload_volume'},
+      {'name': 'DATABRICKS_JOB_ID', 'valueFrom': 'information_extraction_job'},
+    ]
 
     # Write back
     with open(app_path, 'w') as f:
       yaml.safe_dump(app, f, default_flow_style=False, sort_keys=False)
 
-    console.print(f'[green]✅ Synced {app_path} with {base_path}[/green]')
+    console.print(f'[green]✅ Updated {app_path} with app resource references[/green]')
     return True
 
   except Exception as e:
-    console.print(f'[red]❌ Error syncing app.yaml: {e}[/red]')
+    console.print(f'[red]❌ Error updating app.yaml: {e}[/red]')
     return False
 
 
@@ -186,12 +175,16 @@ def validate_config_consistency() -> List[str]:
 
   Runs validation checks and returns list of errors found.
 
+  Since database config is centralized in base.yaml and only DB_PASSWORD
+  is in app.yaml, there's minimal validation needed.
+
   Returns:
       List of error messages (empty if valid)
   """
   try:
     base_path = Path('config/base.yaml')
     app_path = Path('app.yaml')
+    env_local_path = Path('.env.local')
 
     errors = []
 
@@ -203,89 +196,44 @@ def validate_config_consistency() -> List[str]:
       errors.append(f'{app_path} not found')
       return errors
 
-    # Load both files
+    # Load config files
     with open(base_path) as f:
       base = yaml.safe_load(f) or {}
 
     with open(app_path) as f:
       app = yaml.safe_load(f) or {}
 
-    # Build env map from app.yaml
+    # Check that base.yaml has required sections
+    if 'database' not in base:
+      errors.append('database section missing in base.yaml')
+
+    if 'databricks' not in base:
+      errors.append('databricks section missing in base.yaml')
+
+    if 'upload' not in base:
+      errors.append('upload section missing in base.yaml')
+
+    # Check that app.yaml has required resource references
     env_vars = app.get('env', [])
-    env_map = {item['name']: item.get('value') for item in env_vars if 'name' in item}
+    env_names = {item.get('name') for item in env_vars if 'name' in item}
 
-    # Check database config
-    if 'database' in base:
-      db = base['database']
+    required_env_vars = {'DB_PASSWORD', 'UPLOAD_BASE_PATH', 'DATABRICKS_JOB_ID'}
+    missing_vars = required_env_vars - env_names
 
-      if env_map.get('DB_HOST') != db.get('host'):
-        errors.append(
-          f'DB_HOST mismatch: app.yaml={env_map.get("DB_HOST")} vs base.yaml={db.get("host")}'
-        )
+    if missing_vars:
+      errors.append(f'Missing required env variables in app.yaml: {", ".join(missing_vars)}')
 
-      if env_map.get('DB_PORT') and int(env_map.get('DB_PORT', 0)) != db.get('port', 5432):
-        errors.append(
-          f'DB_PORT mismatch: app.yaml={env_map.get("DB_PORT")} vs base.yaml={db.get("port")}'
-        )
-
-      if env_map.get('DB_NAME') != db.get('name'):
-        errors.append(
-          f'DB_NAME mismatch: app.yaml={env_map.get("DB_NAME")} vs base.yaml={db.get("name")}'
-        )
-
-      if env_map.get('DB_USER') != db.get('user'):
-        errors.append(
-          f'DB_USER mismatch: app.yaml={env_map.get("DB_USER")} vs base.yaml={db.get("user")}'
-        )
+    # Check that .env.local has DB_PASSWORD for local development
+    if env_local_path.exists():
+      with open(env_local_path) as f:
+        env_local_content = f.read()
+        if 'DB_PASSWORD=' not in env_local_content:
+          errors.append('DB_PASSWORD not found in .env.local (required for local development)')
 
     return errors
 
   except Exception as e:
     return [f'Error validating config: {e}']
-
-
-def add_job_config_section() -> bool:
-  """Add job configuration section to config/base.yaml.
-
-  This reads values from database, databricks, and secrets sections
-  to avoid duplication and ensure consistency.
-
-  Returns:
-      True if update successful, False otherwise
-  """
-  try:
-    # Read existing config
-    base_yaml = Path('config/base.yaml')
-    if not base_yaml.exists():
-      console.print('[red]❌ config/base.yaml not found[/red]')
-      return False
-
-    with open(base_yaml) as f:
-      config = yaml.safe_load(f) or {}
-
-    # Get values from existing sections
-    database = config.get('database', {})
-    databricks = config.get('databricks', {})
-    secrets = config.get('secrets', {})
-    db_password = secrets.get('database_password', {})
-
-    # Construct job config from existing values
-    job_config = {
-      'job': {
-        'db_password_scope': db_password.get('scope', ''),
-        'lakebase_db_password_key': db_password.get('key', ''),
-        'lakebase_instance_host': database.get('host', ''),
-        'lakebase_db_name': database.get('name', ''),
-        'lakebase_schema_name': database.get('schema', ''),
-        'ai_parse_document_output_table': databricks.get('output_table', ''),
-      }
-    }
-
-    return update_base_config(job_config)
-
-  except Exception as e:
-    console.print(f'[red]❌ Error adding job config section: {e}[/red]')
-    return False
 
 
 def get_config_value(key_path: str) -> Any:

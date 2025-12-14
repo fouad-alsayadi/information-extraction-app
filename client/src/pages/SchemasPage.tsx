@@ -6,9 +6,9 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, FileText, Calendar, Loader2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { SchemasService, ExtractionSchemaSummary, SchemaField } from '../fastapi_client';
+import { SchemasService, ExtractionSchemaSummary, ExtractionSchema, SchemaField } from '../fastapi_client';
 
 interface SchemasPageProps {
   onPageChange?: (page: 'schemas' | 'upload' | 'results' | 'dashboard' | 'job-details' | 'schema-details', jobId?: number, schemaId?: number) => void;
@@ -20,7 +20,7 @@ export function SchemasPage({ onPageChange, duplicateSchemaId }: SchemasPageProp
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [duplicateSchemaData, setDuplicateSchemaData] = useState<ExtractionSchemaSummary | null>(null);
+  const [duplicateSchemaData, setDuplicateSchemaData] = useState<ExtractionSchema | null>(null);
 
   // Load schemas on mount
   useEffect(() => {
@@ -248,7 +248,7 @@ export function SchemasPage({ onPageChange, duplicateSchemaId }: SchemasPageProp
 interface CreateSchemaModalProps {
   onClose: () => void;
   onCreate: (data: { name: string; description: string; fields: SchemaField[] }) => void;
-  duplicateData?: ExtractionSchemaSummary | null;
+  duplicateData?: ExtractionSchema | null;
 }
 
 function CreateSchemaModal({ onClose, onCreate, duplicateData }: CreateSchemaModalProps) {

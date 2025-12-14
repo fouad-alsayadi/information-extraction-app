@@ -57,7 +57,6 @@ async def lifespan(app: FastAPI):
 
     config = get_config()
     logger.info('✅ Configuration loaded successfully')
-    logger.info(f'   Environment: {config.environment}')
     logger.info(f'   Database: {config.database.host}/{config.database.name}')
     logger.info(f'   Upload path: {config.upload.base_path}')
     logger.info(f'   Databricks Job ID: {config.databricks.job_id}')

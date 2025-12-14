@@ -130,37 +130,82 @@ def _stop_process(process: subprocess.Popen) -> None:
     console.print(f'[yellow]⚠️  Error stopping process: {e}[/yellow]')
 
 
-def check_deployed_app(app_url: str) -> bool:
-  """Test deployed app endpoints.
+def check_deployed_app(app_url: str, max_retries: int = 5, initial_wait: int = 10) -> bool:
+  """Test deployed app endpoints with retry logic.
 
   Args:
       app_url: Deployed app URL
+      max_retries: Maximum number of retry attempts (default: 5)
+      initial_wait: Initial wait time in seconds before first attempt (default: 10)
 
   Returns:
       True if app is healthy, False otherwise
   """
+  import time
+
   try:
     console.print(f'[cyan]Testing deployed app: {app_url}[/cyan]')
+    console.print(f'[dim]Waiting {initial_wait}s for app to start...[/dim]')
+    time.sleep(initial_wait)
 
-    # Test health endpoint
-    try:
-      health_url = f'{app_url}/health'
-      response = httpx.get(health_url, timeout=10, follow_redirects=True)
+    # Test health endpoint with retry
+    health_check_passed = False
+    for attempt in range(1, max_retries + 1):
+      try:
+        health_url = f'{app_url}/health'
+        console.print(f'[dim]Attempt {attempt}/{max_retries}...[/dim]')
+        response = httpx.get(health_url, timeout=10, follow_redirects=True)
+        console.print(f'[dim]Status code: {response.status_code}[/dim]')
 
-      if response.status_code == 200:
-        data = response.json()
-        if data.get('status') == 'healthy':
-          console.print('[green]✅ App health check passed[/green]')
-          console.print(f'[dim]Database status: {data.get("database", "unknown")}[/dim]')
+        # Check if we got redirected to a login page (OAuth) - check this first regardless of status
+        if 'Databricks - Sign In' in response.text or 'login' in response.text.lower():
+          console.print(
+            '[yellow]⚠️  App requires OAuth authentication (redirected to login)[/yellow]'
+          )
+          console.print('[green]✅ App is running and responding (auth required)[/green]')
+          health_check_passed = True
+          break  # App is up, just requires auth
+
+        # Check for successful health check response
+        if response.status_code == 200:
+          # Check if response is JSON
+          content_type = response.headers.get('content-type', '')
+          if 'application/json' in content_type:
+            try:
+              data = response.json()
+              console.print(f'[dim]Response: {data}[/dim]')
+              if data.get('status') == 'healthy':
+                console.print('[green]✅ App health check passed[/green]')
+                console.print(f'[dim]Database status: {data.get("database", "unknown")}[/dim]')
+                health_check_passed = True
+                break  # Success, exit retry loop
+              else:
+                console.print(f'[yellow]⚠️  App health check returned: {data}[/yellow]')
+            except Exception as json_err:
+              console.print(f'[yellow]⚠️  Failed to parse JSON: {json_err}[/yellow]')
+              console.print(f'[dim]Response preview: {response.text[:200]}[/dim]')
+          else:
+            console.print('[yellow]⚠️  Health endpoint returned non-JSON response[/yellow]')
+            console.print(f'[dim]Response preview: {response.text[:200]}[/dim]')
         else:
-          console.print(f'[yellow]⚠️  App health check returned: {data}[/yellow]')
-          return False
-      else:
-        console.print(f'[red]❌ Health endpoint returned: {response.status_code}[/red]')
-        return False
+          console.print(
+            f'[yellow]⚠️  Health endpoint returned status {response.status_code}[/yellow]'
+          )
+          console.print(f'[dim]Response preview: {response.text[:200]}[/dim]')
 
-    except Exception as e:
-      console.print(f'[red]❌ Health check failed: {e}[/red]')
+      except Exception as e:
+        console.print(f'[yellow]⚠️  Health check attempt {attempt} failed: {e}[/yellow]')
+        import traceback
+        console.print(f'[dim]{traceback.format_exc()}[/dim]')
+
+      # Wait before next retry (exponential backoff)
+      if attempt < max_retries:
+        wait_time = 5 * attempt  # 5s, 10s, 15s, 20s
+        console.print(f'[dim]Waiting {wait_time}s before next attempt...[/dim]')
+        time.sleep(wait_time)
+
+    if not health_check_passed:
+      console.print('[red]❌ Health check failed after all retries[/red]')
       return False
 
     # Test API endpoint (requires OAuth, may redirect)

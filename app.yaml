@@ -2,16 +2,8 @@ command:
 - uvicorn
 - server.app:app
 env:
-- name: PORT
-  value: '8080'
-- name: DB_HOST
-  value: instance-6308e8f8-a992-4de7-a85c-7beb1fdc8d8a.database.cloud.databricks.com
-- name: DB_PORT
-  value: '5432'
-- name: DB_NAME
-  value: information_extractor
-- name: DB_USER
-  value: sanabil_app
+- name: APP_ENV
+  value: app
 - name: DB_PASSWORD
   valueFrom: lakebase_db_password
 - name: UPLOAD_BASE_PATH

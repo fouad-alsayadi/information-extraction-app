@@ -1,6 +1,0 @@
-# ⚠️ DEPRECATED: This file is no longer used
-#
-# Job notebooks now load configuration directly from ../config/base.yaml
-# This file can be safely deleted - it's kept only for reference
-#
-# To see current configuration, check: ../config/base.yaml (job section)

@@ -1,14 +1,4 @@
-database:
-  host: instance-6308e8f8-a992-4de7-a85c-7beb1fdc8d8a.database.cloud.databricks.com
-  port: 5432
-  name: information_extractor
-  user: sanabil_app
-  schema: information_extraction
-databricks:
-  job_id: 424554646032710
-  output_table: fouad_demos.information_extraction.ai_parse_document_output
 upload:
-  base_path: /Volumes/fouad_demos/information_extraction/sanabil_documents
   max_size_mb: 50
   allowed_extensions:
   - .pdf
@@ -18,14 +8,17 @@ upload:
   - .jpg
   - .jpeg
   - .txt
+  base_path: /Volumes/fouad_demos/information_extraction/sanabil_documents
+database:
+  host: instance-6308e8f8-a992-4de7-a85c-7beb1fdc8d8a.database.cloud.databricks.com
+  port: 5432
+  name: information_extractor
+  user: sanabil_app
+  schema: information_extraction
 secrets:
   database_password:
     scope: information_extraction
     key: lakebase_db_password
-job:
-  db_password_scope: information_extraction
-  lakebase_db_password_key: lakebase_db_password
-  lakebase_instance_host: instance-6308e8f8-a992-4de7-a85c-7beb1fdc8d8a.database.cloud.databricks.com
-  lakebase_db_name: information_extractor
-  lakebase_schema_name: information_extraction
-  ai_parse_document_output_table: fouad_demos.information_extraction.ai_parse_document_output
+databricks:
+  output_table: fouad_demos.information_extraction.ai_parse_document_output
+  job_id: 424554646032710

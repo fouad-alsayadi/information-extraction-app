@@ -590,7 +590,7 @@ def get_app_service_principal(app_name: str) -> Optional[str]:
       return None
 
     app_data = json.loads(result.stdout)
-    service_principal_id = app_data.get('service_principal_id')
+    service_principal_id = app_data.get('service_principal_client_id')
 
     return service_principal_id
 

@@ -24,9 +24,7 @@ from rich.table import Table
 
 # Import our helper modules
 from scripts.config_manager import (
-  add_job_config_section,
-  create_secrets_yaml,
-  update_app_yaml_from_base,
+  update_env_local,
   update_base_config,
   validate_config_consistency,
 )
@@ -387,7 +385,7 @@ def configure_database(state: SetupState) -> bool:
 
   # Prompt for database credentials
   console.print('[bold]Enter database connection details:[/bold]')
-  db_host = Prompt.ask('Database host', default='instance-xxx.database.azuredatabricks.net')
+  db_host = Prompt.ask('Database host', default='instance-6308e8f8-a992-4de7-a85c-7beb1fdc8d8a.database.cloud.databricks.com')
   db_port = Prompt.ask('Database port', default='5432')
   db_name = Prompt.ask('Database name', default='information_extractor')
   db_user = Prompt.ask('Database user', default='sanabil_app')
@@ -400,57 +398,8 @@ def configure_database(state: SetupState) -> bool:
     console.print('[red]❌ Database connection test failed[/red]')
     return False
 
-  # Run migrations
-  console.print('[cyan]Running database migrations...[/cyan]')
-  try:
-    # Import and run create_tables from database.py
-    import sys
-    from pathlib import Path
-
-    # Add server directory to path
-    server_path = Path(__file__).parent.parent / 'server'
-    sys.path.insert(0, str(server_path))
-
-    # Temporarily set environment variables for database connection
-    import os
-
-    old_env = {}
-    env_vars = {
-      'DB_HOST': db_host,
-      'DB_PORT': db_port,
-      'DB_NAME': db_name,
-      'DB_USER': db_user,
-      'DB_PASSWORD': db_password,
-    }
-    for key, value in env_vars.items():
-      old_env[key] = os.environ.get(key)
-      os.environ[key] = str(value)
-
-    try:
-      from database import create_tables
-
-      create_tables()
-      console.print('[green]✅ Database migrations completed[/green]')
-    finally:
-      # Restore original environment
-      for key, old_value in old_env.items():
-        if old_value is None:
-          os.environ.pop(key, None)
-        else:
-          os.environ[key] = old_value
-
-  except Exception as e:
-    console.print(f'[red]❌ Database migrations failed: {e}[/red]')
-    return False
-
-  # Store database configuration
-  from scripts.config_manager import create_secrets_yaml, update_base_config
-
-  # Create secrets.yaml with password
-  if not create_secrets_yaml(db_password):
-    console.print('[yellow]⚠️  Could not create secrets.yaml[/yellow]')
-
-  # Update base config
+  # Store database configuration to base.yaml BEFORE running migrations
+  console.print('[cyan]Saving database configuration to base.yaml...[/cyan]')
   db_config = {
     'database': {
       'host': db_host,
@@ -461,7 +410,37 @@ def configure_database(state: SetupState) -> bool:
     }
   }
   if not update_base_config(db_config):
-    console.print('[yellow]⚠️  Could not update config/base.yaml[/yellow]')
+    console.print('[red]❌ Could not update config/base.yaml[/red]')
+    return False
+
+  # Update .env.local with password
+  if not update_env_local(db_password):
+    console.print('[yellow]⚠️  Could not update .env.local[/yellow]')
+
+  console.print('[green]✅ Database configuration saved[/green]')
+
+  # Run migrations (now that config is saved)
+  console.print('[cyan]Running database migrations...[/cyan]')
+  try:
+    # Set DB_PASSWORD environment variable for migrations
+    os.environ['DB_PASSWORD'] = db_password
+
+    # Import and run create_tables from database.py
+    import sys
+    from pathlib import Path
+
+    # Add server directory to path
+    server_path = Path(__file__).parent.parent / 'server'
+    sys.path.insert(0, str(server_path))
+
+    from database import create_tables
+
+    create_tables()
+    console.print('[green]✅ Database migrations completed[/green]')
+
+  except Exception as e:
+    console.print(f'[red]❌ Database migrations failed: {e}[/red]')
+    return False
 
   # Save database info to state
   state.set_data('database', db_config['database'])
@@ -639,27 +618,26 @@ def configure_catalog_and_volume(state: SetupState) -> bool:
 
   state.set_data('output_table', output_table)
 
-  # Consolidate job configuration into config/base.yaml
+  # Update upload configuration with volume and defaults
   console.print()
-  console.print('[cyan]Consolidating job configuration into config/base.yaml...[/cyan]')
-
-  # Add job configuration section to base.yaml
-  # This reads values from database, databricks, and secrets sections
-  # to ensure consistency and avoid duplication
-  from scripts.config_manager import add_job_config_section, update_base_config
-
-  if not add_job_config_section():
-    console.print('[yellow]⚠️  Could not add job config section[/yellow]')
-
-  # Update upload base_path with volume
-  upload_config = {'upload': {'base_path': volume_path}}
+  console.print('[cyan]Updating upload configuration...[/cyan]')
+  upload_config = {
+    'upload': {
+      'base_path': volume_path,
+      'max_size_mb': 50,
+      'allowed_extensions': ['.pdf', '.docx', '.doc', '.png', '.jpg', '.jpeg', '.txt'],
+    }
+  }
   if not update_base_config(upload_config):
     console.print('[yellow]⚠️  Could not update upload config[/yellow]')
+  else:
+    console.print('[green]✅ Upload configuration saved[/green]')
 
-  console.print('[green]✅ Job configuration consolidated[/green]')
-
-  # Note: job_conf.yaml is deprecated - job notebooks now load directly from ../config/base.yaml
-  console.print('[dim]Note: Job notebooks load configuration from ../config/base.yaml[/dim]')
+  # Note: Job notebooks read directly from database/databricks/secrets sections
+  console.print(
+    '[dim]Note: Job notebooks read config from database/databricks/upload/secrets '
+    'sections (no duplication!)[/dim]'
+  )
 
   return True
 
@@ -727,8 +705,6 @@ def deploy_job(state: SetupState) -> bool:
     return False
 
   # Update config/base.yaml with job_id
-  from scripts.config_manager import update_base_config
-
   job_config = {'databricks': {'job_id': job_id}}
   if not update_base_config(job_config):
     console.print('[yellow]⚠️  Could not update config/base.yaml with job_id[/yellow]')
@@ -752,6 +728,15 @@ def configure_app_resources(state: SetupState) -> bool:
     console.print('[dim]✅ App already deployed (skipping)[/dim]')
     return True
 
+  # Update app.yaml with resource references
+  console.print('[cyan]Updating app.yaml with resource references...[/cyan]')
+  from scripts.config_manager import update_app_yaml_with_resources
+
+  if update_app_yaml_with_resources():
+    console.print('[green]✅ app.yaml updated with resource references[/green]')
+  else:
+    console.print('[yellow]⚠️  Could not update app.yaml (continuing anyway)[/yellow]')
+
   # Validate config consistency
   console.print('[cyan]Validating configuration consistency...[/cyan]')
   from scripts.config_manager import validate_config_consistency
@@ -761,15 +746,7 @@ def configure_app_resources(state: SetupState) -> bool:
     console.print('[yellow]⚠️  Configuration inconsistencies found:[/yellow]')
     for error in errors:
       console.print(f'  - {error}')
-
-    if Confirm.ask('Auto-fix configuration?', default=True):
-      from scripts.config_manager import update_app_yaml_from_base
-
-      if update_app_yaml_from_base():
-        console.print('[green]✅ Configuration fixed[/green]')
-      else:
-        console.print('[red]❌ Could not auto-fix configuration[/red]')
-        return False
+    console.print('[yellow]Please fix these issues manually in base.yaml or app.yaml[/yellow]')
   else:
     console.print('[green]✅ Configuration is consistent[/green]')
 
@@ -856,15 +833,35 @@ def configure_app_resources(state: SetupState) -> bool:
   console.print()
   console.print('[bold cyan]Step 2: Build Frontend[/bold cyan]')
   console.print('[cyan]Building frontend for deployment...[/cyan]')
-  result = subprocess.run(
-    ['npm', 'run', 'build'], cwd='client', capture_output=True, text=True, timeout=300
-  )
 
-  if result.returncode != 0:
-    console.print(f'[red]❌ Frontend build failed: {result.stderr}[/red]')
+  # Clean up any existing zombie processes before starting
+  subprocess.run(['pkill', '-9', 'esbuild'], capture_output=True)
+  subprocess.run(['pkill', '-9', 'vite'], capture_output=True)
+
+  try:
+    result = subprocess.run(
+      ['npm', 'run', 'build'], cwd='client', capture_output=True, text=True, timeout=300
+    )
+
+    if result.returncode != 0:
+      console.print(f'[red]❌ Frontend build failed: {result.stderr}[/red]')
+      # Clean up any zombie esbuild processes
+      subprocess.run(['pkill', '-9', 'esbuild'], capture_output=True)
+      return False
+
+    console.print('[green]✅ Frontend built successfully[/green]')
+  except subprocess.TimeoutExpired:
+    console.print('[red]❌ Frontend build timed out after 300 seconds[/red]')
+    # Clean up any zombie processes on timeout
+    subprocess.run(['pkill', '-9', 'esbuild'], capture_output=True)
+    subprocess.run(['pkill', '-9', 'vite'], capture_output=True)
+    subprocess.run(['pkill', '-9', '-f', 'npm run build'], capture_output=True)
     return False
-
-  console.print('[green]✅ Frontend built successfully[/green]')
+  except Exception as e:
+    console.print(f'[red]❌ Frontend build failed: {e}[/red]')
+    # Clean up any zombie processes on error
+    subprocess.run(['pkill', '-9', 'esbuild'], capture_output=True)
+    return False
 
   # ═══════════════════════════════════════════════════════════════════════
   # STEP 3: DEPLOY SOURCE CODE

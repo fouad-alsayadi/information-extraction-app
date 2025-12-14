@@ -30,10 +30,18 @@ _connection_pool: Optional[SimpleConnectionPool] = None
 
 
 def get_db_config() -> Dict[str, str]:
-  """Get database configuration from centralized config system."""
+  """Get database configuration from centralized config system (config/base.yaml)."""
   from server.config import get_config
 
   config = get_config()
+
+  # Check if database config exists
+  if config.database is None:
+    raise ValueError(
+      'Database configuration not found in config/base.yaml. '
+      'Please run the setup wizard: ./setup.sh'
+    )
+
   return {
     'host': config.database.host,
     'port': str(config.database.port),
