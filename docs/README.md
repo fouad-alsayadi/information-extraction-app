@@ -12,25 +12,7 @@ This application allows users to:
 
 ## Architecture
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   React Client  │◄──►│  FastAPI Server │◄──►│  PostgreSQL DB  │
-│                 │    │                 │    │  (Databricks)   │
-│ - Upload UI     │    │ - REST API      │    │                 │
-│ - Schema Editor │    │ - File Storage  │    │ - Jobs          │
-│ - Results View  │    │ - Job Triggers  │    │ - Schemas       │
-│ - Job Status    │    │                 │    │ - Documents     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │ Databricks Jobs │
-                       │                 │
-                       │ - Parse docs    │
-                       │ - AI extraction │
-                       │ - Store results │
-                       └─────────────────┘
-```
+See [Architecture](../README.md#architecture) in the main README for the system architecture diagram.
 
 ## Database Schema
 

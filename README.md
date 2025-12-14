@@ -151,19 +151,28 @@ See extracted data:
 │   React Client  │◄──►│  FastAPI Server │◄──►│  PostgreSQL DB  │
 │                 │    │                 │    │  (Databricks)   │
 │ - Upload UI     │    │ - REST API      │    │                 │
-│ - Schema Editor │    │ - File Storage  │    │ - Jobs          │
-│ - Results View  │    │ - Job Triggers  │    │ - Schemas       │
-│ - Job Status    │    │                 │    │ - Documents     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │ Databricks Jobs │
-                       │                 │
-                       │ - Parse docs    │
-                       │ - AI extraction │
-                       │ - Store results │
-                       └─────────────────┘
+│ - Schema Editor │    │ - Job Triggers  │    │ - Jobs          │
+│ - Results View  │ ┌──│ - Metadata      │    │ - Schemas       │
+│ - Job Status    │ │  │                 │    │ - Documents     │
+└─────────────────┘ │  └─────────────────┘    └─────────────────┘
+                    │           │                       ▲
+                    │           │                       │
+                    │           ▼                       │
+                    │  ┌─────────────────┐              │
+                    │  │ UC Volume       │              │
+                    │  │                 │              │
+                    │  │ - File Storage  │◄────────┐    │
+                    │  │ - Documents     │         │    │
+                    │  └─────────────────┘         │    │
+                    │                              │    │
+                    │                              │    │
+                    │               ┌─────────────────┐ │
+                    │               │ Databricks Jobs │ │
+                    │               │                 │ │
+                    │               │ - Parse docs    │─┘
+                    └──────────────►│ - AI extraction │
+                                    │ - Store results │
+                                    └─────────────────┘
 ```
 
 ## Database Schema
