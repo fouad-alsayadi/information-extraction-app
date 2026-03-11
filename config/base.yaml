@@ -8,17 +8,17 @@ upload:
   - .jpg
   - .jpeg
   - .txt
-  base_path: /Volumes/fouad_demos/information_extraction/sanabil_documents
+  base_path: /Volumes/sanabil/information_extraction/sanabil_documents
 database:
-  host: instance-6308e8f8-a992-4de7-a85c-7beb1fdc8d8a.database.cloud.databricks.com
+  host: ep-twilight-moon-d10yw2ua.database.us-west-2.cloud.databricks.com
   port: 5432
-  name: information_extractor
-  user: sanabil_app
+  name: sanabil
+  user: sanabil_user
   schema: information_extraction
 secrets:
   database_password:
     scope: information_extraction
     key: lakebase_db_password
 databricks:
-  output_table: fouad_demos.information_extraction.ai_parse_document_output
-  job_id: 424554646032710
+  output_table: sanabil.information_extraction.ai_parse_document_output
+  job_id: 392268728012900

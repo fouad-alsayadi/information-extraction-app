@@ -7,3 +7,5 @@ include:
 targets:
   default:
     mode: development
+    workspace:
+      profile: ibrahim

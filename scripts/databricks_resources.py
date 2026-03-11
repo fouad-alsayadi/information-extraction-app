@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import yaml
-from databricks.sdk import WorkspaceClient
+
 from rich.console import Console
 
 console = Console()
@@ -157,7 +157,7 @@ def create_schema(catalog: str, schema: str) -> bool:
   try:
     console.print(f'[cyan]Creating schema: {catalog}.{schema}[/cyan]')
 
-    cmd = build_databricks_cmd(['databricks', 'schemas', 'create', f'{catalog}.{schema}'])
+    cmd = build_databricks_cmd(['databricks', 'schemas', 'create', schema, catalog])
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
@@ -256,21 +256,26 @@ def test_volume_write(volume_path: str) -> bool:
       tmp.write(test_content)
       temp_path = tmp.name
 
-    # Upload using WorkspaceClient
-    w = WorkspaceClient()
     remote_path = f'{volume_path}/{test_filename}'
-
     console.print(f'[cyan]Testing write permissions to {volume_path}[/cyan]')
 
-    # Upload test file
-    with open(temp_path, 'rb') as f:
-      w.files.upload(remote_path, f)
+    # Upload using CLI to avoid SDK profile conflicts
+    cmd = build_databricks_cmd(
+      ['databricks', 'fs', 'cp', temp_path, f'dbfs:{remote_path}']
+    )
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+      raise RuntimeError(f'Upload failed: {result.stderr}')
 
     console.print('[green]✅ Write test successful[/green]')
 
     # Clean up: Delete the test file
     try:
-      w.files.delete(remote_path)
+      rm_cmd = build_databricks_cmd(
+        ['databricks', 'fs', 'rm', f'dbfs:{remote_path}']
+      )
+      subprocess.run(rm_cmd, capture_output=True, text=True)
       console.print('[green]✅ Test file cleaned up[/green]')
     except Exception as e:
       console.print(f'[yellow]⚠️  Could not delete test file: {e}[/yellow]')
@@ -453,9 +458,34 @@ def deploy_job_bundle(bundle_path: str) -> Optional[dict]:
     os.chdir(bundle_path)
 
     try:
-      # Deploy the bundle (no JSON output available)
+      # Inject workspace profile into bundle config to avoid auth conflicts
+      profile = get_databricks_profile()
+      bundle_yml = Path('databricks.yml')
+      if profile and bundle_yml.exists():
+        with open(bundle_yml) as f:
+          bundle_config = yaml.safe_load(f)
+        # Set profile on the default target's workspace config
+        if 'targets' in bundle_config and 'default' in bundle_config['targets']:
+          target = bundle_config['targets']['default']
+          if target is None:
+            target = {}
+            bundle_config['targets']['default'] = target
+          target.setdefault('workspace', {})['profile'] = profile
+          with open(bundle_yml, 'w') as f:
+            yaml.dump(bundle_config, f, default_flow_style=False)
+
+      # Deploy the bundle
       cmd = build_databricks_cmd(['databricks', 'bundle', 'deploy'])
-      result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+      # Clean env to avoid profile/host conflicts
+      env = {
+        k: v for k, v in os.environ.items()
+        if k not in ('DATABRICKS_HOST', 'DATABRICKS_TOKEN')
+      }
+      if profile:
+        env['DATABRICKS_CONFIG_PROFILE'] = profile
+      result = subprocess.run(
+        cmd, capture_output=True, text=True, timeout=180, env=env
+      )
 
       if result.returncode != 0:
         console.print(f'[red]❌ Bundle deploy failed: {result.stderr}[/red]')
@@ -465,7 +495,7 @@ def deploy_job_bundle(bundle_path: str) -> Optional[dict]:
 
       # Get bundle summary to extract job ID
       cmd = build_databricks_cmd(['databricks', 'bundle', 'summary'])
-      summary_result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+      summary_result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
 
       if summary_result.returncode != 0:
         console.print(f'[yellow]⚠️  Could not get bundle summary: {summary_result.stderr}[/yellow]')
